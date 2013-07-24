@@ -1,0 +1,29 @@
+Name:     flycap
+Version:  0.1.0
+License:  BSD3
+License-File: LICENSE
+Copyright:          (c) 2013 Greg Hale
+Author:             Greg Hale
+Maintainer:         imalsogreg@gmail.com
+Stability:          Experimental
+Homepage:           https://github.com/ImAlsoGreg/hFlyCapture
+Bug-Reports:        https://github.com/ImAlsoGreg/hFlyCapture/issues
+Category:           Graphics
+Build-Type:         Simple
+Synopsis:           Haskell Bindings to FlyCapture2 SDK from Point Grey
+Cabal-Version:      >=1.8
+Extra-Source-Files: README.md
+Description:
+  Description to come.
+
+Source-Repository head
+  Type:     git
+  Location: git://github.com/ImAlsoGreg/hFlyCapture.git
+
+Library
+  Hs-Source-Dirs: src
+  Build-Depends:
+    base     (>= 4 && <= 5)
+  Exposed-Modules:
+    System.FlyCap
+  Ghc-Options: -Wall
