@@ -69,12 +69,13 @@ hStartSCapture i c =
     fc2StartSyncCapture (fromIntegral i) ptr
     return ()
 
-hRetrieveBuffer :: Context ->  IO CImage
+hRetrieveBuffer :: Context ->  IO Image
 hRetrieveBuffer c  =
   alloca $ \ptrImage -> do
     fc2CreateImage ptrImage
     fc2RetrieveBuffer c ptrImage
-    image <- peek ptrImage
+    cImage <- peek ptrImage
+    image <- ctoJImage cImage
     return image
     
 hStopCapture :: Context -> IO ()

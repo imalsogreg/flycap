@@ -21,10 +21,10 @@ instance Storable Version where
   sizeOf _ = ( #size fc2Version)
   alignment _ = alignment (undefined :: CUInt)
   peek ptr = do
-    mjr <- #peek (fc2Version, major) ptr
-    mnr <- #peek (fc2Version, minor) ptr
-    typ <- #peek (fc2Version, type) ptr
-    bld <- #peek (fc2Version, build) ptr
+    mjr <- (#peek fc2Version, major) ptr
+    mnr <- (#peek fc2Version, minor) ptr
+    typ <- (#peek fc2Version, type) ptr
+    bld <- (#peek fc2Version, build) ptr
     return Version {mJ = mjr, mN = mnr, t = typ, b = bld}
   poke ptr (Version mjr, mnr, typ, bld) = do 
     (#poke fc2Version, major) ptr mjr
@@ -38,18 +38,18 @@ instance Storable ConfigRom where
   sizeOf _ = (#size fc2ConfigROM)
   alignment _ = alignment (undefined :: CCInt)
   peek ptr = do
-    n <- #peek (fc2ConfigROM, nodeVendorId) ptr
-    h <- #peek (fc2ConfigROM, chipIdHi) ptr
-    l <- #peek (fc2ConfigROM, chipIdLow) ptr
-    s <- #peek (fc2ConfigROM, unitSpecId) ptr
-    v <- #peek (fc2ConfigROM, unitSWVer) ptr
-    sV <- #peek (fc2ConfigROM, unitSubSWVer) ptr
-    u0 <- #peek (fc2ConfigROM, vendorUniqueInfo_0) ptr
-    u1 <- #peek (fc2ConfigROM, vendorUniqueInfo_1) ptr
-    u2 <- #peek (fc2ConfigROM, vendorUniqueInfo_2) ptr
-    u3 <- #peek (fc2ConfigROM, vendorUniqueInfo_3) ptr
-    k <- #peek (fc2ConfigROM, pszKeyword) ptr
-    r <- #peek (fc2ConfigROM, reserved) ptr
+    n <- (#peek fc2ConfigROM, nodeVendorId) ptr
+    h <- (#peek fc2ConfigROM, chipIdHi) ptr
+    l <- (#peek fc2ConfigROM, chipIdLo) ptr
+    s <- (#peek fc2ConfigROM, unitSpecId) ptr
+    v <- (#peek fc2ConfigROM, unitSWVer) ptr
+    sV <- (#peek fc2ConfigROM, unitSubSWVer) ptr
+    u0 <- (#peek fc2ConfigROM, vendorUniqueInfo_0) ptr
+    u1 <- (#peek fc2ConfigROM, vendorUniqueInfo_1) ptr
+    u2 <- (#peek fc2ConfigROM, vendorUniqueInfo_2) ptr
+    u3 <- (#peek fc2ConfigROM, vendorUniqueInfo_3) ptr
+    k <- (#peek fc2ConfigROM, pszKeyword) ptr
+    r <- (#peek fc2ConfigROM, reserved) ptr
     return ConfigRom { nV = n, cH = h, cL = l, uS = s, uV = v, uSV = sV, i0 = u0, i1 = u1, i2 = u2, i3 = u3, key = k, res = r}
   poke ptr (ConfigRom n, h, l, s, v, sV, u0, u1, u2, u3, k, r) = do
     (#poke fc2ConfigROM, nodeVendorId) ptr n
@@ -96,30 +96,30 @@ instance Storable CamInfo where
   sizeOf _ = ( #size fc2CameraInfo)
   alignment _ = alignment (undefined :: CDouble) --??
   peek ptr = do
-    sN <- #peek (fc2CameraInfo, serialNumber) ptr
-    iT <- #peek (fc2CameraInfo, interfaceType) ptr
-    cC <- #peek (fc2CameraInfo, isColorCamera) ptr
-    mN <- #peek (fc2CameraInfo, modelName) ptr
-    vN <- #peek (fc2CameraInfo, vendorName) ptr
-    sI <- #peek (fc2CameraInfo, sensorInfo) ptr
-    sR <- #peek (fc2CameraInfo, sensorResolution) ptr
-    dN <- #peek (fc2CameraInfo, driverName) ptr
-    fV <- #peek (fc2CameraInfo, firmwareVersion) ptr
-    fBT <- #peek (fc2CameraInfo, firmwareBuildTime) ptr
-    mBS <- #peek (fc2CameraInfo, maximumBusSpeed) ptr
-    bTF <- #peek (fc2CameraInfo, bayerTileFormat) ptr
-    iV <-  #peek (fc2CameraInfo, iidcVer) ptr
-    cR <-  #peek (fc2CameraInfo, configRom) ptr
-    mjV <- #peek (fc2CameraInfo, gigEMajorVersion) ptr 
-    mnV <- #peek (fc2CameraInfo, gigEMinorVersion) ptr
-    uDN <- #peek (fc2CameraInfo, userDefinedName) ptr
-    u1 <- #peek (fc2CameraInfo, xmlURL1) ptr
-    u2 <- #peek (fc2CameraInfo, xmlURL2) ptr
-    mA <- #peek (fc2CameraInfo, macAddress) ptr
-    iA <- #peek (fc2CameraInfo, ipAddress) ptr
-    sM <- #peek (fc2CameraInfo, subnetMask) ptr
-    dG <- #peek (fc2CameraInfo, defaultGateway) ptr
-    r <- #peek (fc2CameraInfo, reserved) ptr
+    sN <- (#peek fc2CameraInfo, serialNumber) ptr
+    iT <- (#peek fc2CameraInfo, interfaceType) ptr
+    cC <- (#peek fc2CameraInfo, isColorCamera) ptr
+    mN <- (#peek fc2CameraInfo, modelName) ptr
+    vN <- (#peek fc2CameraInfo, vendorName) ptr
+    sI <- (#peek fc2CameraInfo, sensorInfo) ptr
+    sR <- (#peek fc2CameraInfo, sensorResolution) ptr
+    dN <- (#peek fc2CameraInfo, driverName) ptr
+    fV <- (#peek fc2CameraInfo, firmwareVersion) ptr
+    fBT <- (#peek fc2CameraInfo, firmwareBuildTime) ptr
+    mBS <- (#peek fc2CameraInfo, maximumBusSpeed) ptr
+    bTF <- (#peek fc2CameraInfo, bayerTileFormat) ptr
+    iV <-  (#peek fc2CameraInfo, iidcVer) ptr
+    cR <-  (#peek fc2CameraInfo, configROM) ptr
+    mjV <- (#peek fc2CameraInfo, gigEMajorVersion) ptr 
+    mnV <- (#peek fc2CameraInfo, gigEMinorVersion) ptr
+    uDN <- (#peek fc2CameraInfo, userDefinedName) ptr
+    u1 <- (#peek fc2CameraInfo, xmlURL1) ptr
+    u2 <- (#peek fc2CameraInfo, xmlURL2) ptr
+    mA <- (#peek fc2CameraInfo, macAddress) ptr
+    iA <- (#peek fc2CameraInfo, ipAddress) ptr
+    sM <- (#peek fc2CameraInfo, subnetMask) ptr
+    dG <- (#peek fc2CameraInfo, defaultGateway) ptr
+    r <- (#peek fc2CameraInfo, reserved) ptr
     return CamInfo { serialNum = sN, iFType = iT, colorCam = cC, modelName = mN, vendorName = vN, sensorInfo = sI,sensorRes = sR, driverName = dN , firmwareVersion = fV, firmwareBuildTime = fBT, maxBusSpeed = mBS, bayerTileFormat = fBT, iidcVer = iV, configRom = cR, majorVersion = mjV, minorVersion = mnV , userDefName = uDN, xmlURL1 = u1, xmlURL2 = u2, macAddress = mA, ipAddress = iA, subnetMask = sM , defaultGateway = dG, reserved = r}
   poke ptr (CamInfo sN iT cC mN vN sI sR dN fV fBT mBS bTF iV cR mjV mnV uDN u1 u2 mA iA sM dG r) = do 
     (#poke fc2CameraInfo, serialNumber) ptr sN
@@ -135,7 +135,7 @@ instance Storable CamInfo where
     (#poke fc2CameraInfo, maximumBusSpeed) ptr mBS
     (#poke fc2CameraInfo, bayerTileFormat) ptr bTF
     (#poke fc2CameraInfo, iidcVer) ptr iV
-    (#poke fc2CameraInfo, configRom) ptr cR
+    (#poke fc2CameraInfo, configROM) ptr cR
     (#poke fc2CameraInfo, gigEMajorVersion) ptr mjV 
     (#poke fc2CameraInfo, gigEMinorVersion) ptr mnV
     (#poke fc2CameraInfo, userDefinedName) ptr uDN
@@ -179,7 +179,7 @@ instance Storeable CImage where
     (#poke fc2Image, dataSize) ptr dS
     (#poke fc2Image, format) ptr f
     (#poke fc2Image, bayerFormat) ptr bF
-    (#poke fc2Image, imageIMPl) ptr iI
+    (#poke fc2Image, imageImpl) ptr iI
 
 
 --functions used in tracker.c:  
