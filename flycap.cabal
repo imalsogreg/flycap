@@ -24,6 +24,9 @@ Library
   Hs-Source-Dirs: src
   Build-Depends:
     base     (>= 4 && <= 5)
+    , JuicyPixels (>=3.1 && < 4.0)
+  Other-Modules:
+    System.FlyCap.FlyCapBase
   Exposed-Modules:
     System.FlyCap
-  Ghc-Options: -Wall
+  Ghc-Options: -Wall -v
