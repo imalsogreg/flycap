@@ -1,0 +1,21 @@
+name:          test
+version:       0.1
+homepage:      http://github.com/ImAlsoGreg/hcomedi
+description:
+    Bindings for comedilib linux input/output card drivers
+category:      Hardware
+license:       GPL-3
+license-file:  LICENSE
+author:        Greg Hale
+maintainer:    imalsogreg@gmail.com
+cabal-version: >= 1.8
+build-type:    Simple
+
+
+executable test
+  main-is:          test.hs
+  build-depends:    base >= 4 && <= 5 
+  extra-lib-dirs:   /usr/lib
+  extra-libraries:  flycapture-c
+  include-dirs:     /usr/include/flycapture/C
+  ghc-options:      -dynamic
