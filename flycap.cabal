@@ -21,9 +21,15 @@ Source-Repository head
   Location: git://github.com/ImAlsoGreg/hFlyCapture.git
 
 Library
-  Hs-Source-Dirs: src
   Build-Depends:
     base     (>= 4 && <= 5)
+    , JuicyPixels (>=3.1 && < 4.0)
+  extra-lib-dirs: /usr/lib
+  extra-libraries: flycapture-c
+  -- include-dirs: /usr/include/flycapture/C
+  Hs-Source-Dirs: src
+  Other-Modules:
+    System.FlyCap.FlyCapBase
   Exposed-Modules:
     System.FlyCap
-  Ghc-Options: -Wall
+  Ghc-Options: -Wall -dynamic
