@@ -5,6 +5,9 @@ module System.FlyCap.FlyCapBase where
 import Foreign
 import Foreign.C.Types
 import Foreign.Ptr
+import Foreign.ForeignPtr
+import Codec.Picture
+import qualified Data.ByteString as B
 
 #include <FlyCapture2_C.h>
 
@@ -16,7 +19,7 @@ type Error = CInt
 type ImageData = Ptr CUChar
 
 
-data Version = { mJ ::CUInt, mN :: CUInt, t :: CUInt, b :: CUInt}
+data Version = Version{ mJ ::CUInt, mN :: CUInt, t :: CUInt, b :: CUInt}
 instance Storable Version where
   sizeOf _ = ( #size fc2Version)
   alignment _ = alignment (undefined :: CUInt)
@@ -26,7 +29,7 @@ instance Storable Version where
     typ <- (#peek fc2Version, type) ptr
     bld <- (#peek fc2Version, build) ptr
     return Version {mJ = mjr, mN = mnr, t = typ, b = bld}
-  poke ptr (Version mjr, mnr, typ, bld) = do 
+  poke ptr (Version mjr mnr typ bld) = do 
     (#poke fc2Version, major) ptr mjr
     (#poke fc2Version, minor) ptr mnr
     (#poke fc2Version, type) ptr typ
@@ -36,7 +39,7 @@ instance Storable Version where
 data ConfigRom = ConfigRom {nV :: CUInt, cH :: CUInt, cL :: CUInt, uS :: CUInt, uV :: CUInt, uSV :: CUInt, i0 :: CUInt, i1:: CUInt, i2:: CUInt, i3::  CUInt, key :: CChar, res:: CUInt} 
 instance Storable ConfigRom where
   sizeOf _ = (#size fc2ConfigROM)
-  alignment _ = alignment (undefined :: CCInt)
+  alignment _ = alignment (undefined :: CInt)
   peek ptr = do
     n <- (#peek fc2ConfigROM, nodeVendorId) ptr
     h <- (#peek fc2ConfigROM, chipIdHi) ptr
@@ -51,7 +54,7 @@ instance Storable ConfigRom where
     k <- (#peek fc2ConfigROM, pszKeyword) ptr
     r <- (#peek fc2ConfigROM, reserved) ptr
     return ConfigRom { nV = n, cH = h, cL = l, uS = s, uV = v, uSV = sV, i0 = u0, i1 = u1, i2 = u2, i3 = u3, key = k, res = r}
-  poke ptr (ConfigRom n, h, l, s, v, sV, u0, u1, u2, u3, k, r) = do
+  poke ptr (ConfigRom n h l s v sV u0 u1 u2 u3 k r) = do
     (#poke fc2ConfigROM, nodeVendorId) ptr n
     (#poke fc2ConfigROM, chipIdHi) ptr h
     (#poke fc2ConfigROM, chipIdLo) ptr l
@@ -77,7 +80,7 @@ data CamInfo = CamInfo { serialNum :: CUInt
                   , firmwareVersion :: CChar  
                   , firmwareBuildTime :: CChar  
                   , maxBusSpeed :: CInt --technically an enumerator 
-                  , bayerTileFormat :: CInt -- technically an enumerator
+                  , bayerTileFormat :: CChar-- technically an enumerator
                   , iidcVer :: CUInt 
                   , configRom :: ConfigRom
                   , majorVersion :: CUInt  
@@ -94,33 +97,33 @@ data CamInfo = CamInfo { serialNum :: CUInt
                
 instance Storable CamInfo where
   sizeOf _ = ( #size fc2CameraInfo)
-  alignment _ = alignment (undefined :: CDouble) --??
+  alignment _ = alignment (undefined :: CDouble)
   peek ptr = do
-    sN <- (#peek fc2CameraInfo, serialNumber) ptr
-    iT <- (#peek fc2CameraInfo, interfaceType) ptr
-    cC <- (#peek fc2CameraInfo, isColorCamera) ptr
-    mN <- (#peek fc2CameraInfo, modelName) ptr
-    vN <- (#peek fc2CameraInfo, vendorName) ptr
-    sI <- (#peek fc2CameraInfo, sensorInfo) ptr
-    sR <- (#peek fc2CameraInfo, sensorResolution) ptr
-    dN <- (#peek fc2CameraInfo, driverName) ptr
-    fV <- (#peek fc2CameraInfo, firmwareVersion) ptr
-    fBT <- (#peek fc2CameraInfo, firmwareBuildTime) ptr
-    mBS <- (#peek fc2CameraInfo, maximumBusSpeed) ptr
-    bTF <- (#peek fc2CameraInfo, bayerTileFormat) ptr
-    iV <-  (#peek fc2CameraInfo, iidcVer) ptr
-    cR <-  (#peek fc2CameraInfo, configROM) ptr
-    mjV <- (#peek fc2CameraInfo, gigEMajorVersion) ptr 
-    mnV <- (#peek fc2CameraInfo, gigEMinorVersion) ptr
-    uDN <- (#peek fc2CameraInfo, userDefinedName) ptr
-    u1 <- (#peek fc2CameraInfo, xmlURL1) ptr
-    u2 <- (#peek fc2CameraInfo, xmlURL2) ptr
-    mA <- (#peek fc2CameraInfo, macAddress) ptr
-    iA <- (#peek fc2CameraInfo, ipAddress) ptr
-    sM <- (#peek fc2CameraInfo, subnetMask) ptr
-    dG <- (#peek fc2CameraInfo, defaultGateway) ptr
-    r <- (#peek fc2CameraInfo, reserved) ptr
-    return CamInfo { serialNum = sN, iFType = iT, colorCam = cC, modelName = mN, vendorName = vN, sensorInfo = sI,sensorRes = sR, driverName = dN , firmwareVersion = fV, firmwareBuildTime = fBT, maxBusSpeed = mBS, bayerTileFormat = fBT, iidcVer = iV, configRom = cR, majorVersion = mjV, minorVersion = mnV , userDefName = uDN, xmlURL1 = u1, xmlURL2 = u2, macAddress = mA, ipAddress = iA, subnetMask = sM , defaultGateway = dG, reserved = r}
+             sN <- (#peek fc2CameraInfo, serialNumber) ptr
+             iT <- (#peek fc2CameraInfo, interfaceType) ptr
+             cC <- (#peek fc2CameraInfo, isColorCamera) ptr
+             mN <- (#peek fc2CameraInfo, modelName) ptr
+             vN <- (#peek fc2CameraInfo, vendorName) ptr
+             sI <- (#peek fc2CameraInfo, sensorInfo) ptr
+             sR <- (#peek fc2CameraInfo, sensorResolution) ptr
+             dN <- (#peek fc2CameraInfo, driverName) ptr
+             fV <- (#peek fc2CameraInfo, firmwareVersion) ptr
+             fBT <- (#peek fc2CameraInfo, firmwareBuildTime) ptr
+             mBS <- (#peek fc2CameraInfo, maximumBusSpeed) ptr
+             bTF <- (#peek fc2CameraInfo, bayerTileFormat) ptr
+             iV <-  (#peek fc2CameraInfo, iidcVer) ptr
+             cR <-  (#peek fc2CameraInfo, configROM) ptr
+             mjV <- (#peek fc2CameraInfo, gigEMajorVersion) ptr 
+             mnV <- (#peek fc2CameraInfo, gigEMinorVersion) ptr
+             uDN <- (#peek fc2CameraInfo, userDefinedName) ptr
+             u1 <- (#peek fc2CameraInfo, xmlURL1) ptr
+             u2 <- (#peek fc2CameraInfo, xmlURL2) ptr
+             mA <- (#peek fc2CameraInfo, macAddress) ptr
+             iA <- (#peek fc2CameraInfo, ipAddress) ptr
+             sM <- (#peek fc2CameraInfo, subnetMask) ptr
+             dG <- (#peek fc2CameraInfo, defaultGateway) ptr
+             r <- (#peek fc2CameraInfo, reserved) ptr
+             return CamInfo { serialNum = sN, iFType = iT, colorCam = cC, modelName = mN, vendorName = vN, sensorInfo = sI,sensorRes = sR, driverName = dN , firmwareVersion = fV, firmwareBuildTime = fBT, maxBusSpeed = mBS, bayerTileFormat = fBT, iidcVer = iV, configRom = cR, majorVersion = mjV, minorVersion = mnV , userDefName = uDN, xmlURL1 = u1, xmlURL2 = u2, macAddress = mA, ipAddress = iA, subnetMask = sM , defaultGateway = dG, reserved = r}
   poke ptr (CamInfo sN iT cC mN vN sI sR dN fV fBT mBS bTF iV cR mjV mnV uDN u1 u2 mA iA sM dG r) = do 
     (#poke fc2CameraInfo, serialNumber) ptr sN
     (#poke fc2CameraInfo, interfaceType) ptr iT
@@ -158,7 +161,7 @@ data CImage = CImage { rows :: CUInt
                    , imageIMPl :: Ptr ()  
                    }  
               
-instance Storeable CImage where
+instance Storable CImage where
   sizeOf _ = (#size fc2Image)
   alignment _ = alignment (undefined :: CDouble) 
   peek ptr = do
@@ -171,7 +174,7 @@ instance Storeable CImage where
     bF <- (#peek fc2Image, bayerFormat) ptr
     iI <- (#peek fc2Image, imageImpl) ptr
     return CImage {rows = r, cols = c, stride = s, pData = p, dataSize = dS, format = f, bayerFormat = bF, imageIMPl = iI}
-  poke ptr (CImage r, c, s, p ,dS, f, bF, iI) = do 
+  poke ptr (CImage r c s p dS f bF iI) = do 
     (#poke fc2Image, rows) ptr r
     (#poke fc2Image, cols) ptr c
     (#poke fc2Image, stride) ptr s
@@ -226,24 +229,27 @@ foreign import ccall unsafe "FlyCapture2_C.h fc2GetImageData"
 foreign import ccall unsafe "FlyCapture2_C.h fc2Disconnect"
   fc2Disconnect :: Context -> IO Error
 
---TODO: FINISH THE FUNCTIONS CONVERTING FROM JUICYPIXELS IMAGE TO CIMAGE
 
-     
-ctoJImage :: CImage -> IO Image
-ctoJImage CImage r c _ p _ _ _ _ = do
+
+-- FIX THIS FUNCTION     
+ctoJImage :: CImage -> IO DynamicImage
+ctoJImage (CImage r c _ p _ _ _ _ ) = do
   let h = fromIntegral r
   let w = fromIntegral c
-  allocaArray $ \ptr -> do
-    let ptr =p 
-    dC <- peekArray ptr
-    let d = map (fromIntegral) dC
-    let image = Image w h d
-    return image
+  fp <- newForeignPtr_ p
+  a <- peekArray (h*w) p -- arr: [CUChar]
+  let arr = map (fromIntegral) a 
+  let bs = B.pack arr
+  -- let bs = fromForeignPtr fp 0 (r*c) -- foreign pointer to byte string
+  let i = (decodeImage bs) --byte string to (juicypixels) imagei
+  case i of 
+    Right a -> return a
+    Left b -> error "could not get image" 
+  
     
   
 {-
-
-   **what should I do with these ones?
+  **what should I do with these ones?
    CVCapture ??
    PrintErrorTrace ... fc2ErrorToDescription ??
  
@@ -252,6 +258,4 @@ ctoJImage CImage r c _ p _ _ _ _ = do
    
    **TODO:
    test/see if this works
-   look for more functions to bind (like the ones in the test file)/make it work
-
--}
+   look for more functions to bind (like the ones in the test file)/make it work -}
