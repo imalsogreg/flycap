@@ -5,19 +5,30 @@ module System.FlyCap.FlyCapBase where
 import Foreign
 import Foreign.C.Types
 import Foreign.Ptr
-import Foreign.ForeignPtr
 import Codec.Picture
 import qualified Data.ByteString as B
+import Control.Monad
 
 #include <FlyCapture2_C.h>
 
 -- raw c imports here
 
 type Context = Ptr () --fc2Context is a void pointer in C
-type PGRGuid = CUInt --fc2PGRGuid a structure that 'holds' an unsigned int in C
+
 type Error = CInt
 type ImageData = Ptr CUChar
 
+data PGRGuid = PGRGuid {value :: [CUInt]} deriving (Show) --fc2PGRGuid a structure that 'holds' an unsigned int in C
+instance Storable PGRGuid  where
+  sizeOf _ = (#size fc2PGRGuid)
+  alignment _ = alignment (undefined :: CUInt)
+  peek ptr = do
+    --val <- replicateM 4 $ (#peek fc2PGRGuid, value) ptr
+    val <- (peekArray 4 ((#ptr fc2PGRGuid, value) ptr))
+    return PGRGuid {value = val}
+
+  poke ptr (PGRGuid val)  = do
+    mapM_  (\s -> (#poke fc2PGRGuid, value) ptr s) val
 
 data Version = Version{ mJ ::CUInt, mN :: CUInt, t :: CUInt, b :: CUInt}
 instance Storable Version where
@@ -36,7 +47,7 @@ instance Storable Version where
     (#poke fc2Version, build) ptr bld
 
 
-data ConfigRom = ConfigRom {nV :: CUInt, cH :: CUInt, cL :: CUInt, uS :: CUInt, uV :: CUInt, uSV :: CUInt, i0 :: CUInt, i1:: CUInt, i2:: CUInt, i3::  CUInt, key :: CChar, res:: CUInt} 
+data ConfigRom = ConfigRom {nV :: CUInt, cH :: CUInt, cL :: CUInt, uS :: CUInt, uV :: CUInt, uSV :: CUInt, i0 :: CUInt, i1:: CUInt, i2:: CUInt, i3::  CUInt, key :: CChar, res:: CUInt} deriving (Show)
 instance Storable ConfigRom where
   sizeOf _ = (#size fc2ConfigROM)
   alignment _ = alignment (undefined :: CInt)
@@ -80,7 +91,7 @@ data CamInfo = CamInfo { serialNum :: CUInt
                   , firmwareVersion :: CChar  
                   , firmwareBuildTime :: CChar  
                   , maxBusSpeed :: CInt --technically an enumerator 
-                  , bayerTileFormat :: CChar-- technically an enumerator
+                  , bayerTileFormat :: CInt -- technically an enumerator
                   , iidcVer :: CUInt 
                   , configRom :: ConfigRom
                   , majorVersion :: CUInt  
@@ -93,7 +104,7 @@ data CamInfo = CamInfo { serialNum :: CUInt
                   , subnetMask :: CUChar -- technically an fc2IPAddress 
                   , defaultGateway :: CUChar  -- technically an fc2IPAddress
                   , reserved :: CUInt  
-                  }
+                  } deriving (Show)
                
 instance Storable CamInfo where
   sizeOf _ = ( #size fc2CameraInfo)
@@ -102,7 +113,7 @@ instance Storable CamInfo where
              sN <- (#peek fc2CameraInfo, serialNumber) ptr
              iT <- (#peek fc2CameraInfo, interfaceType) ptr
              cC <- (#peek fc2CameraInfo, isColorCamera) ptr
-             mN <- (#peek fc2CameraInfo, modelName) ptr
+             modN <- (#peek fc2CameraInfo, modelName) ptr
              vN <- (#peek fc2CameraInfo, vendorName) ptr
              sI <- (#peek fc2CameraInfo, sensorInfo) ptr
              sR <- (#peek fc2CameraInfo, sensorResolution) ptr
@@ -123,12 +134,12 @@ instance Storable CamInfo where
              sM <- (#peek fc2CameraInfo, subnetMask) ptr
              dG <- (#peek fc2CameraInfo, defaultGateway) ptr
              r <- (#peek fc2CameraInfo, reserved) ptr
-             return CamInfo { serialNum = sN, iFType = iT, colorCam = cC, modelName = mN, vendorName = vN, sensorInfo = sI,sensorRes = sR, driverName = dN , firmwareVersion = fV, firmwareBuildTime = fBT, maxBusSpeed = mBS, bayerTileFormat = fBT, iidcVer = iV, configRom = cR, majorVersion = mjV, minorVersion = mnV , userDefName = uDN, xmlURL1 = u1, xmlURL2 = u2, macAddress = mA, ipAddress = iA, subnetMask = sM , defaultGateway = dG, reserved = r}
-  poke ptr (CamInfo sN iT cC mN vN sI sR dN fV fBT mBS bTF iV cR mjV mnV uDN u1 u2 mA iA sM dG r) = do 
+             return CamInfo { serialNum = sN, iFType = iT, colorCam = cC, modelName = modN, vendorName = vN, sensorInfo = sI,sensorRes = sR, driverName = dN , firmwareVersion = fV, firmwareBuildTime = fBT, maxBusSpeed = mBS, bayerTileFormat = bTF, iidcVer = iV, configRom = cR, majorVersion = mjV, minorVersion = mnV , userDefName = uDN, xmlURL1 = u1, xmlURL2 = u2, macAddress = mA, ipAddress = iA, subnetMask = sM , defaultGateway = dG, reserved = r}
+  poke ptr (CamInfo sN iT cC modN vN sI sR dN fV fBT mBS bTF iV cR mjV mnV uDN u1 u2 mA iA sM dG r) = do 
     (#poke fc2CameraInfo, serialNumber) ptr sN
     (#poke fc2CameraInfo, interfaceType) ptr iT
     (#poke fc2CameraInfo, isColorCamera) ptr cC
-    (#poke fc2CameraInfo, modelName) ptr mN
+    (#poke fc2CameraInfo, modelName) ptr modN
     (#poke fc2CameraInfo, vendorName) ptr vN
     (#poke fc2CameraInfo, sensorInfo) ptr sI
     (#poke fc2CameraInfo, sensorResolution) ptr sR
@@ -159,7 +170,7 @@ data CImage = CImage { rows :: CUInt
                    , format :: CInt --technically an fc2PixelFormat (an enumerator)
                    , bayerFormat ::CInt --technically an enumerator  
                    , imageIMPl :: Ptr ()  
-                   }  
+                   }  deriving (Show)
               
 instance Storable CImage where
   sizeOf _ = (#size fc2Image)
@@ -232,20 +243,23 @@ foreign import ccall unsafe "FlyCapture2_C.h fc2Disconnect"
 
 
 -- FIX THIS FUNCTION     
-ctoJImage :: CImage -> IO DynamicImage
+ctoJImage :: CImage -> IO B.ByteString -- IO DynamicImage
 ctoJImage (CImage r c _ p _ _ _ _ ) = do
   let h = fromIntegral r
   let w = fromIntegral c
-  fp <- newForeignPtr_ p
+  print $ "h was: " ++ show h
+  print $ "w was: " ++ show w
   a <- peekArray (h*w) p -- arr: [CUChar]
+  print $ "array was" ++ show a
   let arr = map (fromIntegral) a 
   let bs = B.pack arr
+  return bs
   -- let bs = fromForeignPtr fp 0 (r*c) -- foreign pointer to byte string
-  let i = (decodeImage bs) --byte string to (juicypixels) imagei
+  {-let i = (decodeImage bs) --byte string to (juicypixels) imagei
   case i of 
-    Right a -> return a
-    Left b -> error "could not get image" 
-  
+    Right img -> return img
+    Left _ -> error "could not get image" 
+  -}
     
   
 {-
