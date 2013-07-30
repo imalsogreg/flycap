@@ -28,8 +28,12 @@ Library
   extra-libraries: flycapture-c
   include-dirs: /usr/include/flycapture/C
   Hs-Source-Dirs: src
-  Other-Modules:
+  Other-Modules: 
     System.FlyCap.FlyCapBase
+  Build-Depends:
+    base     (>= 4 && <= 5)
+    , bytestring
+    , JuicyPixels (>=3.1 && < 4.0)
   Exposed-Modules:
     System.FlyCap
   Ghc-Options: -Wall
