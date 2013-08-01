@@ -13,8 +13,9 @@ main = do
   info <- hGetCamInfo c
   print $ "info from hgetcaminfo: " ++ show info
   print $ "number of cameras: " ++ show num
- 
   hStartSCapture num c
-  image <- retBuffer c
+  (FCImage nCol nRow vData) <- hRetrieveBuffer c
+  let imageJ = JP.Image nCol nRow vData
+  
   return ()
     
