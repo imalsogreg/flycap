@@ -1,5 +1,6 @@
 import System.FlyCap
-import Codec.Picture
+import qualified Codec.Picture as JP
+import qualified Data.Vector.Storable as VS
 
 main = do
   c <- hCreateC
@@ -14,11 +15,6 @@ main = do
   print $ "number of cameras: " ++ show num
  
   hStartSCapture num c
-  image <- hRetrieveBuffer c
-  hStopCapture c
-  hDisconnect c
-  print $ "bytestring:" ++ show image
-  -- savePngImage "testimage.png" image
+  image <- retBuffer c
   return ()
     
-    --getpicture, save it as png via juicy pixels

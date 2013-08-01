@@ -1,12 +1,21 @@
 module System.FlyCap where
 
-
 import Foreign
-import System.FlyCap.FlyCapBase
+import Foreign.C.Types
+import Foreign.ForeignPtr.Safe
 import Foreign.C.Error
-import Codec.Picture
-import Foreign.ForeignPtr
-import qualified Data.ByteString as B
+import System.FlyCap.FlyCapBase
+--import Codec.Picture
+import qualified Data.Vector.Storable as VS
+
+-- FlyCapture image specialized on CUChar (C 8-bit greyscale) pixels
+-- Obviously not the optimal data type.  We'd want the option
+-- to handle color / 2-byte pixels too.  Maybe depend on juicypixels
+-- and use their DynamicImage type instead of this
+data FCImage = FCImage
+               Int -- ^ column count (width)
+               Int -- ^ row count    (height)
+               (VS.Vector CUChar)
 
 hGetNum :: Context -> IO Int
 hGetNum c = 
@@ -81,7 +90,7 @@ hStartSCapture i c =
      (fc2StartSyncCapture (fromIntegral i) ptr))
     return ()
 
-hRetrieveBuffer :: Context -> IO B.ByteString --  IO DynamicImage
+hRetrieveBuffer :: Context -> IO FCImage --  IO DynamicImage
 hRetrieveBuffer c  =
   alloca $ \ptrImage -> do
     (throwErrnoIf_ (/=0) ("creating image -- for retrieving buffer")
@@ -89,10 +98,12 @@ hRetrieveBuffer c  =
     (throwErrnoIf_ (/=0) ("retrieve buffer")
      (fc2RetrieveBuffer c ptrImage))
     cImage <- peek ptrImage
-    print $ "image from retrievebuffer: " ++ show cImage
-    image <- (ctoJImage cImage)
-    return image
-    
+    cImageDataF <- newForeignPtr_ (pData cImage)
+    let nR = fromIntegral $ rows cImage
+        nC = fromIntegral $ cols cImage
+    return $
+      FCImage nC nR (VS.unsafeFromForeignPtr cImageDataF 0 (nC * nR))
+
 hStopCapture :: Context -> IO ()
 hStopCapture c = do
   (throwErrnoIf_ (/=0) ("stop capture")
