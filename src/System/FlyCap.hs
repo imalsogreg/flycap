@@ -104,6 +104,12 @@ hRetrieveBuffer c  =
     return $
       FCImage nC nR (VS.unsafeFromForeignPtr cImageDataF 0 (nC * nR))
 
+hStartCapture :: Context -> IO ()
+hStartCapture c = do
+  error <- fc2StartCapture c
+  print $ "start capture error is: " ++ show error
+  return ()
+  
 hStopCapture :: Context -> IO ()
 hStopCapture c = do
   (throwErrnoIf_ (/=0) ("stop capture")

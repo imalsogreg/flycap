@@ -28,7 +28,7 @@ instance Storable PGRGuid  where
     return PGRGuid {value = val}
 
   poke ptr (PGRGuid val)  = do
-    mapM_  (\s -> (#poke fc2PGRGuid, value) ptr s) val
+   pokeArray ((#ptr fc2PGRGuid, value)  ptr) val
 
 data Version = Version{ mJ ::CUInt, mN :: CUInt, t :: CUInt, b :: CUInt}
 instance Storable Version where
@@ -224,6 +224,9 @@ foreign import ccall unsafe "FlyCapture2_C.h fc2SetVideoModeAndFrameRate"
 
 foreign import ccall unsafe "FlyCapture2_C.h fc2StartSyncCapture"
   fc2StartSyncCapture :: CUInt -> Ptr Context -> IO Error
+                         
+foreign import ccall unsafe "FlyCapture2_C.h fc2StartCapture"
+  fc2StartCapture :: Context -> IO Error
  
 foreign import ccall unsafe "FlyCapture2_C.h fc2RetrieveBuffer"
   fc2RetrieveBuffer :: Context ->Ptr CImage -> IO Error
