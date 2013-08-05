@@ -1,25 +1,31 @@
 import System.FlyCap
 import qualified Codec.Picture as JP
+import qualified Codec.Picture.Types as JPTypes
 import qualified Data.Vector.Storable as VS
 import Control.Concurrent
 
 main = do
   c <- hCreateC
-  print $ "context is: " ++ show c
   num <- hGetNum c
   pgrguid <- hGetCamSerial c 12320156
-  print $ "pgrguid" ++ show pgrguid
-  threadDelay 1000000
   hConnect c pgrguid
-  threadDelay 1000000
   info <- hGetCamInfo c
-  print $ "info from hgetcaminfo: " ++ show info
-  print $ "number of cameras: " ++ show num
   hStartCapture c
-  (FCImage nCol nRow vData) <- hRetrieveBuffer c
-  let jCData = VS.map fromIntegral vData
-  let imageJ = JP.Image nCol nRow jCData
-  let dImage = JP.ImageY8 imageJ
-  JP.saveBmpImage "test.bmp" dImage
+  threadDelay 1000000
+  image <- hRetrieveBuffer c
+  dImage <- getDynamicImage image
+  JP.saveBmpImage "test.bmp"  dImage
+  test <- JP.readBitmap "test.bmp" 
+  case test of Left s -> print s
+               Right image -> putStrLn "success"
+  hStopCapture c
+  hDisconnect c
   return ()
+  
     
+getDynamicImage :: FCImage -> IO JP.DynamicImage
+getDynamicImage (FCImage nCol nRow vData) = do
+  let jCData = VS.map fromIntegral vData
+  let imageJ = (JP.Image nCol nRow jCData ::JPTypes.Image JPTypes.Pixel8) 
+  let dImage = JP.ImageRGB8 (JPTypes.promoteImage imageJ :: JPTypes.Image JPTypes.PixelRGB8)
+  return dImage

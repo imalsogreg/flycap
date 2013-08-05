@@ -5,8 +5,8 @@ import Foreign.C.Types
 import Foreign.ForeignPtr.Safe
 import Foreign.C.Error
 import System.FlyCap.FlyCapBase
---import Codec.Picture
 import qualified Data.Vector.Storable as VS
+import qualified Codec.Picture as JP
 
 -- FlyCapture image specialized on CUChar (C 8-bit greyscale) pixels
 -- Obviously not the optimal data type.  We'd want the option
@@ -20,8 +20,7 @@ data FCImage = FCImage
 hGetNum :: Context -> IO Int
 hGetNum c = 
   alloca $ \ptr -> do
-     e <- fc2getNumOfCameras c ptr
-     print $ "error message for cameras: " ++ show e
+     _ <- fc2getNumOfCameras c ptr
      cNum <- peek ptr
      let num = fromIntegral cNum
      return (num)
@@ -29,19 +28,15 @@ hGetNum c =
 hCreateC :: IO Context
 hCreateC =
     alloca $ \pContext -> do
-      --throwErrnoIf_ (/=0) ("create context did not work")
-       --(fc2CreateContext pContext)) 
-      e <- fc2CreateContext pContext
-      print $ "error message from create context is: " ++ show e
+      (throwErrnoIf_ (/=0) ("create context did not work")
+       (fc2CreateContext pContext))
       peek pContext
 
 hGetCamIndex :: Context -> Int -> IO PGRGuid
 hGetCamIndex c i =
   alloca $ \ptr -> do
-  --  (throwErrnoIf_ (/=0) ("get camera index")
-  --   (fc2GetCameraFromIndex c (fromIntegral i) ptr))
-    e <- fc2GetCameraFromIndex c (fromIntegral i) ptr
-    print $ "error message for get camera from index is : " ++ show e
+    (throwErrnoIf_ (/=0) ("get camera index")
+     (fc2GetCameraFromIndex c (fromIntegral i) ptr))
     guid <- peek ptr
     return (guid)
     
@@ -56,10 +51,9 @@ hConnect :: Context -> PGRGuid -> IO ()
 hConnect c guid =
   alloca $ \pG -> do
     poke pG guid
-  --  (throwErrnoIf_ (/=0) ("connect")
-  --   (fc2Connect c pG))
-    e <- fc2Connect c pG
-    print $ "error message from hConnect is: " ++  show e
+    (throwErrnoIf_ (/=0) ("connect")
+     (fc2Connect c pG))
+
     return ()
 
 hLibVersion :: IO Version
@@ -90,7 +84,7 @@ hStartSCapture i c =
      (fc2StartSyncCapture (fromIntegral i) ptr))
     return ()
 
-hRetrieveBuffer :: Context -> IO FCImage --  IO DynamicImage
+hRetrieveBuffer :: Context -> IO FCImage
 hRetrieveBuffer c  =
   alloca $ \ptrImage -> do
     (throwErrnoIf_ (/=0) ("creating image -- for retrieving buffer")
@@ -107,7 +101,6 @@ hRetrieveBuffer c  =
 hStartCapture :: Context -> IO ()
 hStartCapture c = do
   error <- fc2StartCapture c
-  print $ "start capture error is: " ++ show error
   return ()
   
 hStopCapture :: Context -> IO ()
@@ -130,4 +123,3 @@ hDisconnect c = do
   (throwErrnoIf_ (/=0) ("disconnecting")
    (fc2Disconnect c))
   return ()
-  
