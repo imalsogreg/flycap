@@ -4,9 +4,9 @@ import Control.Concurrent
 import Data.IORef
 import Graphics.UI.GLFW as GLFW
 import System.Exit (exitWith, ExitCode (..))
-import qualified Data.Vector.Storable as VS
-import qualified Codec.Picture as JP
-import qualified Codec.Picture.Types as JPTypes
+--import qualified Data.Vector.Storable as VS
+--import qualified Codec.Picture as JP
+--import qualified Codec.Picture.Types as JPTypes
 import System.FlyCap
 
 -- only one retrieve buffer per cycle
@@ -28,27 +28,28 @@ main = do
   GLFW.setWindowCloseCallback win (Just (shutdown c))
   initGL
   forever $ do
-    print "System in Forever loop"
     GLFW.pollEvents
-    print "just polled events"
-    i <- hRetrieveBuffer c -- gives us an FC Image
-    print "just retrieved image"
-    im <-getImage  i -- gives us a JImage with Y8 Pixel
-    let image = (JPTypes.promoteImage im :: JPTypes.Image JPTypes.PixelRGB8) --change to RGB8 Pixel
-    tex <- loadTex image
-     -- bring back the IORef??
-  --  t <- newIORef tex
+    i <- hRetBuff c -- gives us a CImage 
+    --old system using hRetrieveBuffer, which gives us an FCImage, and JuicyPixels
+    -- im <-getImage  i -- gives us a JImage with Y8 Pixel
+    --let image = (JPTypes.promoteImage im :: JPTypes.Image JPTypes.PixelRGB8) --change to RGB8 Pixel
+    tex <- loadTex i
     display tex
+    -- deleting image: 
+    destroyImage i
     GLFW.swapBuffers win
-    print "just swappedBuffers"
-    threadDelay 500000
  
-getTex :: JP.Image (JPTypes.PixelRGB8) -> IO ()
+getT :: CImage -> IO ()  
+getT (CImage r c str pData dS f bF iI)  = do
+  (texImage2D Nothing NoProxy 0 Luminance8 (TextureSize2D (fromIntegral c) (fromIntegral r)) 0 (PixelData Luminance UnsignedByte  pData))
+  
+{- old system using juicy pixels:
+  getTex :: JP.Image (JPTypes.PixelRGB8) -> IO ()
 getTex (JP.Image width height dat) = do
   VS.unsafeWith dat $ \ptr -> do
     (texImage2D Nothing NoProxy 0 RGB8 (TextureSize2D (fromIntegral width) (fromIntegral height)) 0 (PixelData RGB UnsignedByte ptr))
   print "system at getTex"
-                             
+-}                             
                
 display :: TextureObject -> IO()
 display tex = do
@@ -56,7 +57,7 @@ display tex = do
   loadIdentity
   textureBinding Texture2D $= Just tex
   scale (1) (-1) (0 :: GLfloat)
-  renderPrimitive Quads $ do
+  renderPrimitive Quads $ do -- render/draw the image
     texCoord (TexCoord2 0 (1::GLfloat))
     vertex (Vertex3 (-1) 1 (0::GLfloat))
     texCoord (TexCoord2 1 (1::GLfloat))
@@ -65,24 +66,17 @@ display tex = do
     vertex (Vertex3 (1) (-1) (0::GLfloat))
     texCoord (TexCoord2 0 (0::GLfloat))
     vertex (Vertex3 (-1) (-1) (0::GLfloat))
-    
-  --t' $= texs
   flush
-  print "system at display"
- -- threadDelay (500000)
-  --swapBuffers
-  
-loadTex :: JP.Image JPTypes.PixelRGB8 -> IO TextureObject
+
+--loadTex :: JP.Image JPTypes.PixelRGB8 -> IO TextureObject (old system)
+loadTex :: CImage -> IO TextureObject
 loadTex im = do
   texobj <- genObjectNames 1 -- get a list of exactly 1 texture object
   textureBinding Texture2D $= Just (head texobj)
   textureFilter Texture2D $= ((Nearest, Nothing), Nearest)
-  getTex im -- put the image into the texture
-  print "system at loadTex"
+  getT im -- put the image into the texture
   return $ head texobj
  
- 
-
 cameraInit c= do
   num <- hGetNum c
   pgrguid <- hGetCamIndex c 0
@@ -103,7 +97,6 @@ resize _ width height = do
   loadIdentity
   ortho (-1.0) 1.0 (-1.0) 1.0 (-1) (1 :: GLdouble)
   matrixMode $= Modelview 0
-  loadIdentity
   flush
   
 initGL :: IO ()
@@ -121,7 +114,6 @@ initGL = do
 keyPressed :: Context -> GLFW.KeyCallback
 keyPressed c win GLFW.Key'Escape _ GLFW.KeyState'Pressed _ = shutdown c win
 keyPressed _  _ _ _ _ _ = return ()
--- have other key pressed options
 
 --shutdown :: GLFW.WindowCloseCallback
 shutdown c win = do
@@ -130,3 +122,7 @@ shutdown c win = do
   exitWith ExitSuccess
   cameraStop c
 
+
+--TODO :
+-- make it show more than 10 frames at a time!!!
+-- add more keys pressed options

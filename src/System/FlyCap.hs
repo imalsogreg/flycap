@@ -1,8 +1,9 @@
 module System.FlyCap ( VideoMode (..) 
                      , FrameRate (..)
                      , Context
-                     , FCImage (..)
-                     , CImage (..)
+                     , FCImage (..) 
+                     , CImage (..) 
+                     , hRetBuff  
                      , hGetNum 
                      , hCreateC 
                      , hGetCamIndex 
@@ -20,9 +21,9 @@ module System.FlyCap ( VideoMode (..)
                      , getDynamicImage
                      , getImage
                      , hDestroyContext
-                       
                      , fc2CreateImage
                      , fc2RetrieveBuffer
+                     , destroyImage  
                      ) where
 
 import qualified System.FlyCap.FlyCapBase as FlyCapBase
@@ -119,14 +120,30 @@ hRetrieveBuffer c  =
   alloca $ \ptrImage -> do
     (throwErrnoIf_ (/=0) ("creating image -- for retrieving buffer")
      (fc2CreateImage ptrImage))
-    (throwErrnoIf_ (/=0) ("retrieve buffer")
-     (fc2RetrieveBuffer c ptrImage))
-    cImage <- peek ptrImage
+    print "created image for retrieving buffer" 
+    print $ show c
+    print "now trying to retrieve buffer"
+    e <- fc2RetrieveBuffer c ptrImage
+    print $ "error is: " ++ (show e)
+   -- (throwErrnoIf_ (/=0) ("retrieve buffer")
+     --(fc2RetrieveBuffer c ptrImage))
+    print "retrieved image, trying to peek to pointer"
+    cImage <- peek ptrImage -- CImage
+    print "got cimage"
     cImageDataF <- newForeignPtr_ (pData cImage)
+    print "did weird foreign pointer thing"
     let nR = fromIntegral $ rows cImage
         nC = fromIntegral $ cols cImage
     return $
       FCImage nC nR (VS.unsafeFromForeignPtr cImageDataF 0 (nC * nR))
+
+hRetBuff :: Context -> IO CImage
+hRetBuff c =
+  alloca $ \ptrImage -> do
+    e <- fc2CreateImage ptrImage
+    eRB <- fc2RetrieveBuffer c ptrImage
+    (CImage r c str pData dS f bF iI) <- peek ptrImage
+    return (CImage r c str pData dS f bF iI)
 
 hStartCapture :: Context -> IO ()
 hStartCapture c = do
@@ -144,8 +161,8 @@ hGetImageData image =
     alloca $ \ptrImage -> do
       poke ptrImage image :: IO ()
       _ <- fc2GetImageData ptrImage ptrID
-      ptrid <- peek ptrID
-      return ptrid
+      id <- peek ptrID
+      return id
       
 hDisconnect :: Context -> IO()
 hDisconnect c = do
@@ -170,3 +187,12 @@ getImage (FCImage nCol nRow vData) = do
   let jCData = VS.map fromIntegral vData
   let imageJ = (JP.Image nCol nRow jCData ::JPTypes.Image JPTypes.Pixel8) 
   return imageJ
+  
+destroyImage :: CImage -> IO ()
+destroyImage im = do
+  alloca $ \ptr -> do 
+    poke ptr im
+    e <-fc2DestroyImage ptr
+    if e == 0 then return () else
+                                  print $ "error from destroying image is: " ++ (show e)
+                                  --return ()
