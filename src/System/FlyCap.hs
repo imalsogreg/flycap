@@ -2,6 +2,8 @@ module System.FlyCap ( VideoMode (..)
                      , FrameRate (..)
                      , Context
                      , FCImage (..) 
+                     , CImage (..) 
+                     , hRetBuff  
                      , hGetNum 
                      , hCreateC 
                      , hGetCamIndex 
@@ -113,14 +115,32 @@ hRetrieveBuffer c  =
   alloca $ \ptrImage -> do
     (throwErrnoIf_ (/=0) ("creating image -- for retrieving buffer")
      (fc2CreateImage ptrImage))
-    (throwErrnoIf_ (/=0) ("retrieve buffer")
-     (fc2RetrieveBuffer c ptrImage))
-    cImage <- peek ptrImage
+    print "created image for retrieving buffer" 
+    print $ show c
+    print "now trying to retrieve buffer"
+    e <- fc2RetrieveBuffer c ptrImage
+    print $ "error is: " ++ (show e)
+   -- (throwErrnoIf_ (/=0) ("retrieve buffer")
+     --(fc2RetrieveBuffer c ptrImage))
+    print "retrieved image, trying to peek to pointer"
+    cImage <- peek ptrImage -- CImage
+    print "got cimage"
     cImageDataF <- newForeignPtr_ (pData cImage)
+    print "did weird foreign pointer thing"
     let nR = fromIntegral $ rows cImage
         nC = fromIntegral $ cols cImage
     return $
       FCImage nC nR (VS.unsafeFromForeignPtr cImageDataF 0 (nC * nR))
+
+hRetBuff :: Context -> IO CImage
+hRetBuff c =
+  alloca $ \ptrImage -> do
+    e <- fc2CreateImage ptrImage
+    print $ "error from creating image during retrieve buffer is: " ++ (show e)
+    eRB <- fc2RetrieveBuffer c ptrImage
+    print $ "error from retrieve buffer is: " ++ (show e)
+    cImage <- peek ptrImage
+    return cImage
 
 hStartCapture :: Context -> IO ()
 hStartCapture c = do
@@ -139,8 +159,8 @@ hGetImageData image =
     alloca $ \ptrImage -> do
       poke ptrImage image :: IO ()
       _ <- fc2GetImageData ptrImage ptrID
-      ptrid <- peek ptrID
-      return ptrid
+      id <- peek ptrID
+      return id
       
 hDisconnect :: Context -> IO()
 hDisconnect c = do
