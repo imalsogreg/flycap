@@ -88,6 +88,7 @@ cameraInit c= do
 cameraStop c = do
   hStopCapture c
   hDisconnect c
+  hDestroyContext c
 
 resize :: GLFW.WindowSizeCallback
 resize win w 0 = resize win w 1
