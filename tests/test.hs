@@ -8,7 +8,7 @@ import Control.Monad
 main = do
   c <- hCreateC
   num <- hGetNum c
-  pgrguid <- hGetCamSerial c 12320156
+  pgrguid <- hGetCamIndex c 0
   hConnect c pgrguid
   info <- hGetCamInfo c
   hStartCapture c

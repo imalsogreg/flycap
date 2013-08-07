@@ -28,24 +28,20 @@ main = do
   GLFW.setWindowCloseCallback win (Just (shutdown c))
   initGL
   forever $ do
-    print "System in Forever loop"
     GLFW.pollEvents
-    print "just polled events"
     i <- hRetBuff c -- gives us a CImage 
     --old system using hRetrieveBuffer, which gives us an FCImage, and JuicyPixels
     -- im <-getImage  i -- gives us a JImage with Y8 Pixel
     --let image = (JPTypes.promoteImage im :: JPTypes.Image JPTypes.PixelRGB8) --change to RGB8 Pixel
-    print "just retrieved image"
     tex <- loadTex i
     display tex
+    -- deleting image: 
+    destroyImage i
     GLFW.swapBuffers win
-    print "just swappedBuffers"
-    threadDelay 50000
  
 getT :: CImage -> IO ()  
 getT (CImage r c str pData dS f bF iI)  = do
   (texImage2D Nothing NoProxy 0 Luminance8 (TextureSize2D (fromIntegral c) (fromIntegral r)) 0 (PixelData Luminance UnsignedByte  pData))
-  print "system at getT"
   
 {- old system using juicy pixels:
   getTex :: JP.Image (JPTypes.PixelRGB8) -> IO ()
@@ -71,9 +67,7 @@ display tex = do
     texCoord (TexCoord2 0 (0::GLfloat))
     vertex (Vertex3 (-1) (-1) (0::GLfloat))
   flush
-  print "system at display"
 
-  
 --loadTex :: JP.Image JPTypes.PixelRGB8 -> IO TextureObject (old system)
 loadTex :: CImage -> IO TextureObject
 loadTex im = do
@@ -81,7 +75,6 @@ loadTex im = do
   textureBinding Texture2D $= Just (head texobj)
   textureFilter Texture2D $= ((Nearest, Nothing), Nearest)
   getT im -- put the image into the texture
-  print "system at loadTex"
   return $ head texobj
  
 cameraInit c= do
@@ -104,7 +97,6 @@ resize _ width height = do
   loadIdentity
   ortho (-1.0) 1.0 (-1.0) 1.0 (-1) (1 :: GLdouble)
   matrixMode $= Modelview 0
-  loadIdentity
   flush
   
 initGL :: IO ()

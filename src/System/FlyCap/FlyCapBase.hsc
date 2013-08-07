@@ -310,6 +310,8 @@ foreign import ccall unsafe "FlyCapture2_C.h fc2GetImageData"
 foreign import ccall unsafe "FlyCapture2_C.h fc2Disconnect"
   fc2Disconnect :: Context -> IO Error
 
+foreign import ccall unsafe "FlyCapture2_C.h fc2DestroyImage"
+  fc2DestroyImage :: Ptr CImage -> IO Error
 
 
 -- FIX THIS FUNCTION     

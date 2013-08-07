@@ -19,6 +19,7 @@ module System.FlyCap ( VideoMode (..)
                      , hGetImageData
                      , hDisconnect
                      , getDynamicImage
+                     , destroyImage  
                      , getImage) where
 
 import qualified System.FlyCap.FlyCapBase as FlyCapBase
@@ -136,11 +137,9 @@ hRetBuff :: Context -> IO CImage
 hRetBuff c =
   alloca $ \ptrImage -> do
     e <- fc2CreateImage ptrImage
-    print $ "error from creating image during retrieve buffer is: " ++ (show e)
     eRB <- fc2RetrieveBuffer c ptrImage
-    print $ "error from retrieve buffer is: " ++ (show e)
-    cImage <- peek ptrImage
-    return cImage
+    (CImage r c str pData dS f bF iI) <- peek ptrImage
+    return (CImage r c str pData dS f bF iI)
 
 hStartCapture :: Context -> IO ()
 hStartCapture c = do
@@ -182,3 +181,12 @@ getImage (FCImage nCol nRow vData) = do
   let jCData = VS.map fromIntegral vData
   let imageJ = (JP.Image nCol nRow jCData ::JPTypes.Image JPTypes.Pixel8) 
   return imageJ
+  
+destroyImage :: CImage -> IO ()
+destroyImage im = do
+  alloca $ \ptr -> do 
+    poke ptr im
+    e <-fc2DestroyImage ptr
+    if e == 0 then return () else
+                                  print $ "error from destroying image is: " ++ (show e)
+                                  --return ()
