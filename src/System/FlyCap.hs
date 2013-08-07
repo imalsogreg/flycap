@@ -1,17 +1,41 @@
-module System.FlyCap where
+module System.FlyCap ( VideoMode (..) 
+                     , FrameRate (..)
+                     , Context
+                     , FCImage (..) 
+                     , hGetNum 
+                     , hCreateC 
+                     , hGetCamIndex 
+                     , hGetCamSerial 
+                     , hConnect
+                     , hLibVersion
+                     , hGetCamInfo
+                     , hSetVMandFR
+                     , hStartSCapture
+                     , hRetrieveBuffer
+                     , hStartCapture
+                     , hStopCapture
+                     , hGetImageData
+                     , hDisconnect
+                     , getDynamicImage
+                     , getImage) where
 
+import qualified System.FlyCap.FlyCapBase as FlyCapBase
 import Foreign
 import Foreign.C.Types
 import Foreign.ForeignPtr.Safe
 import Foreign.C.Error
-import System.FlyCap.FlyCapBase
+import System.FlyCap.FlyCapBase hiding (Context)
 import qualified Data.Vector.Storable as VS
 import qualified Codec.Picture as JP
+import qualified Codec.Picture.Types as JPTypes
 
 -- FlyCapture image specialized on CUChar (C 8-bit greyscale) pixels
 -- Obviously not the optimal data type.  We'd want the option
 -- to handle color / 2-byte pixels too.  Maybe depend on juicypixels
 -- and use their DynamicImage type instead of this
+
+type Context = FlyCapBase.Context
+
 data FCImage = FCImage
                Int -- ^ column count (width)
                Int -- ^ row count    (height)
@@ -71,9 +95,9 @@ hGetCamInfo c =
     camInfo <- peek ptrCI
     return camInfo
     
-hSetVMandFR :: Context -> Int -> Int -> IO ()
+hSetVMandFR :: Context -> VideoMode -> FrameRate -> IO ()
 hSetVMandFR c vidMode frameRate = do 
-  _ <- fc2SetVideoModeAndFrameRate c (fromIntegral vidMode) (fromIntegral frameRate)
+  _ <- fc2SetVideoModeAndFrameRate c (vmToC vidMode) (frToC frameRate)
   return ()
   
 hStartSCapture :: Int -> Context -> IO ()
@@ -123,3 +147,18 @@ hDisconnect c = do
   (throwErrnoIf_ (/=0) ("disconnecting")
    (fc2Disconnect c))
   return ()
+  
+    
+getDynamicImage :: FCImage -> IO JP.DynamicImage
+getDynamicImage (FCImage nCol nRow vData) = do
+  let jCData = VS.map fromIntegral vData
+  let imageJ = (JP.Image nCol nRow jCData ::JPTypes.Image JPTypes.Pixel8) 
+  let dImage = JP.ImageRGB8 (JPTypes.promoteImage imageJ :: JPTypes.Image JPTypes.PixelRGB8)
+  return dImage
+
+   
+getImage :: FCImage -> IO (JP.Image JPTypes.Pixel8)
+getImage (FCImage nCol nRow vData) = do
+  let jCData = VS.map fromIntegral vData
+  let imageJ = (JP.Image nCol nRow jCData ::JPTypes.Image JPTypes.Pixel8) 
+  return imageJ

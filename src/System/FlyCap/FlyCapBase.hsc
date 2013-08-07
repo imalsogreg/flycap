@@ -14,7 +14,6 @@ import Control.Monad
 -- raw c imports here
 
 type Context = Ptr () --fc2Context is a void pointer in C
-
 type Error = CInt
 type ImageData = Ptr CUChar
 
@@ -195,6 +194,74 @@ instance Storable CImage where
     (#poke fc2Image, bayerFormat) ptr bF
     (#poke fc2Image, imageImpl) ptr iI
 
+highToC :: (Eq a, Ord a, Eq b, Ord b) => [(a,b)] -> b -> a -> b
+highToC constMap valDefault query = 
+  maybe valDefault id (lookup query constMap)
+
+cToHigh :: (Eq a, Ord a, Eq b, Ord b) => [(a,b)] -> a -> b -> a
+cToHigh constMap valDefault query =
+  maybe valDefault id (lookup query (fl constMap))
+  where fl m = map (\(f,s) -> (s,f)) m
+        
+data VideoMode = VM160x120 | VM320x240 | VM640x480_YUV411 | VM640x480_YUV422 | VM640x480_RGB | VM640x480_Y8 | VM640x480_Y16 | VM800x600_YUV422 | VM800x600_RGB | VM800x600_Y8 | VM800x600_Y16 | VM1024x768_YUV422 | VM1024x768_RGB | VM1024x768_Y8 | VM1024x768_Y16 | VM1280x960_YUV422 | VM1280x960_RGB | VM1280x960_Y8 | VM1280x960_Y16 | VM1600x1200_YUV422 | VM1600x1200_RGB | VM1600x1200_Y8 | VM1600x1200_Y16 | VMFormat7 | VMNum | VMForce32b deriving (Ord,Eq,Show)
+
+vmMap :: [(VideoMode, CInt)]
+vmMap = [ ( VM800x600_Y8, #const FC2_VIDEOMODE_800x600Y8)
+        , ( VM160x120, #const FC2_VIDEOMODE_160x120YUV444) 	
+        , ( VM320x240, #const FC2_VIDEOMODE_320x240YUV422)
+        , ( VM640x480_YUV411, #const FC2_VIDEOMODE_640x480YUV411)
+        , ( VM640x480_YUV422, #const FC2_VIDEOMODE_640x480YUV422)
+        , ( VM640x480_RGB, #const FC2_VIDEOMODE_640x480RGB)
+        , ( VM640x480_Y8, #const FC2_VIDEOMODE_640x480Y8)
+        , ( VM640x480_Y16, #const FC2_VIDEOMODE_640x480Y16)
+        , ( VM800x600_YUV422, #const FC2_VIDEOMODE_800x600YUV422)
+        , ( VM800x600_RGB, #const FC2_VIDEOMODE_800x600RGB)
+        , ( VM800x600_Y16, #const FC2_VIDEOMODE_800x600Y16)
+        , ( VM1024x768_YUV422, #const FC2_VIDEOMODE_1024x768YUV422)
+        , ( VM1024x768_RGB, #const FC2_VIDEOMODE_1024x768RGB) 
+        , ( VM1024x768_Y8, #const FC2_VIDEOMODE_1024x768Y8)
+        , ( VM1024x768_Y16, #const FC2_VIDEOMODE_1024x768Y16)
+        , ( VM1280x960_YUV422, #const FC2_VIDEOMODE_1280x960YUV422)
+        , ( VM1280x960_RGB, #const FC2_VIDEOMODE_1280x960RGB)
+        , ( VM1280x960_Y8, #const FC2_VIDEOMODE_1280x960Y8)
+        , ( VM1280x960_Y16, #const FC2_VIDEOMODE_1280x960Y16) 
+        , (VM1600x1200_YUV422, #const FC2_VIDEOMODE_1600x1200YUV422)
+        , (VM1600x1200_RGB, #const FC2_VIDEOMODE_1600x1200RGB)
+        , (VM1600x1200_Y8, #const FC2_VIDEOMODE_1600x1200Y8)
+        , (VM1600x1200_Y16, #const FC2_VIDEOMODE_1600x1200Y16)
+        , (VMFormat7, #const FC2_VIDEOMODE_FORMAT7)
+        , (VMNum, #const FC2_NUM_VIDEOMODES)
+        , (VMForce32b, #const FC2_VIDEOMODE_FORCE_32BITS)]
+
+vmFromC :: CInt -> VideoMode
+vmFromC = cToHigh vmMap VM640x480_Y8
+
+vmToC :: VideoMode -> CInt
+vmToC = highToC vmMap (snd (head vmMap))
+
+data FrameRate = Fr1_875 |Fr3_75 | Fr7_5 | Fr_15 | Fr_30 | Fr_60 | Fr_120 | Fr_240 | FrFormat7 | FrNumFR | FrForce32b 
+               deriving (Eq, Ord, Show)
+  
+frMap :: [(FrameRate, CInt)]  
+frMap = [ (Fr_30, #const FC2_FRAMERATE_30)
+        , (Fr1_875, #const FC2_FRAMERATE_1_875)
+        , (Fr3_75, #const FC2_FRAMERATE_3_75)
+        , (Fr7_5, #const FC2_FRAMERATE_7_5)
+        , (Fr_15, #const FC2_FRAMERATE_15)
+        , (Fr_60, #const FC2_FRAMERATE_60)
+        , (Fr_120, #const FC2_FRAMERATE_120)
+        , (Fr_240, #const FC2_FRAMERATE_240)
+        , (FrFormat7, #const FC2_FRAMERATE_FORMAT7)
+        , (FrNumFR, #const FC2_NUM_FRAMERATES)
+        , (FrForce32b, #const FC2_FRAMERATE_FORCE_32BITS) ]
+
+
+
+frFromC :: CInt -> FrameRate
+frFromC = cToHigh frMap Fr_30 
+  
+frToC :: FrameRate -> CInt
+frToC =  highToC frMap (snd (head frMap))
 
 --functions used in tracker.c:  
 
