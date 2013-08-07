@@ -85,7 +85,7 @@ loadTex im = do
 
 cameraInit c= do
   num <- hGetNum c
-  pgrguid <- hGetCamSerial c 12320156
+  pgrguid <- hGetCamIndex c 0
   hConnect c pgrguid
   info <- hGetCamInfo c
   hSetVMandFR c  VM800x600_Y8  Fr_30

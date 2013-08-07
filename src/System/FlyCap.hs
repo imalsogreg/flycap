@@ -1,7 +1,8 @@
 module System.FlyCap ( VideoMode (..) 
                      , FrameRate (..)
                      , Context
-                     , FCImage (..) 
+                     , FCImage (..)
+                     , CImage (..)
                      , hGetNum 
                      , hCreateC 
                      , hGetCamIndex 
@@ -17,7 +18,12 @@ module System.FlyCap ( VideoMode (..)
                      , hGetImageData
                      , hDisconnect
                      , getDynamicImage
-                     , getImage) where
+                     , getImage
+                     , hDestroyContext
+                       
+                     , fc2CreateImage
+                     , fc2RetrieveBuffer
+                     ) where
 
 import qualified System.FlyCap.FlyCapBase as FlyCapBase
 import Foreign
@@ -124,8 +130,7 @@ hRetrieveBuffer c  =
 
 hStartCapture :: Context -> IO ()
 hStartCapture c = do
-  error <- fc2StartCapture c
-  return ()
+  throwErrnoIf_ (/=0) "Start capture failure" (fc2StartCapture c)
   
 hStopCapture :: Context -> IO ()
 hStopCapture c = do
@@ -147,7 +152,10 @@ hDisconnect c = do
   (throwErrnoIf_ (/=0) ("disconnecting")
    (fc2Disconnect c))
   return ()
-  
+
+hDestroyContext :: Context -> IO ()
+hDestroyContext c =
+  throwErrnoIf_ (/=0) "Destroy context failed." (fc2DestroyContext c)
     
 getDynamicImage :: FCImage -> IO JP.DynamicImage
 getDynamicImage (FCImage nCol nRow vData) = do

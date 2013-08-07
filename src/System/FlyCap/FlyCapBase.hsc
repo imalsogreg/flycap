@@ -161,15 +161,15 @@ instance Storable CamInfo where
     (#poke fc2CameraInfo, reserved) ptr r
 
 
-data CImage = CImage { rows :: CUInt
-                   , cols :: CUInt  
-                   , stride :: CUInt  
-                   , pData :: Ptr CUChar  
-                   , dataSize :: CUInt  
-                   , format :: CInt --technically an fc2PixelFormat (an enumerator)
-                   , bayerFormat ::CInt --technically an enumerator  
-                   , imageIMPl :: Ptr ()  
-                   }  deriving (Show)
+data CImage = CImage { rows        :: CUInt
+                     , cols        :: CUInt  
+                     , stride      :: CUInt  
+                     , pData       :: Ptr CUChar  
+                     , dataSize    :: CUInt  
+                     , format      :: CInt -- an fc2PixelFormat enum
+                     , bayerFormat :: CInt -- an enum
+                     , imageIMPl   :: Ptr ()  
+                     } deriving (Show)
               
 instance Storable CImage where
   sizeOf _ = (#size fc2Image)
@@ -310,7 +310,8 @@ foreign import ccall unsafe "FlyCapture2_C.h fc2GetImageData"
 foreign import ccall unsafe "FlyCapture2_C.h fc2Disconnect"
   fc2Disconnect :: Context -> IO Error
 
-
+foreign import ccall unsafe "FlyCapture2_C.h fc2DestroyContext"
+  fc2DestroyContext :: Context -> IO Error
 
 -- FIX THIS FUNCTION     
 ctoJImage :: CImage -> IO B.ByteString -- IO DynamicImage
