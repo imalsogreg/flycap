@@ -16,7 +16,19 @@ import Control.Monad
 type Context = Ptr () --fc2Context is a void pointer in C
 type Error = CInt
 type ImageData = Ptr CUChar
-
+type AVIContext = Ptr ()
+data  AVIOption = AVIOption {frameRate :: CFloat, reservedList :: Ptr CUInt} 
+instance Storable AVIOption where
+  sizeOf _ = (#size fc2AVIOption)
+  alignment _ = alignment (undefined :: CFloat)
+  peek ptr = do
+    fr <- (#peek fc2AVIOption, frameRate) ptr
+    res <- (#peek fc2AVIOption, reserved) ptr
+    return AVIOption {frameRate = fr, reservedList = res}
+  poke ptr (AVIOption fr res) = do
+    (#poke fc2AVIOption, frameRate) ptr fr
+    (#poke fc2AVIOption, reserved) ptr res
+    
 data PGRGuid = PGRGuid {value :: [CUInt]} deriving (Show) --fc2PGRGuid a structure that 'holds' an unsigned int in C
 instance Storable PGRGuid  where
   sizeOf _ = (#size fc2PGRGuid)
@@ -310,15 +322,27 @@ foreign import ccall unsafe "FlyCapture2_C.h fc2GetImageData"
 foreign import ccall unsafe "FlyCapture2_C.h fc2Disconnect"
   fc2Disconnect :: Context -> IO Error
 
-
 foreign import ccall unsafe "FlyCapture2_C.h fc2DestroyContext"
   fc2DestroyContext :: Context -> IO Error
 
 foreign import ccall unsafe "FlyCapture2_C.h fc2DestroyImage"
   fc2DestroyImage :: Ptr CImage -> IO Error
 
+foreign import ccall unsafe "FlyCapture2_C.h fc2AVIAppend"
+  fc2AVIAppend :: AVIContext -> Ptr CImage -> IO Error
 
--- FIX THIS FUNCTION     
+foreign import ccall unsafe "FlyCapture2_C.h fc2AVIClose"
+  fc2AVIClose :: AVIContext -> IO Error
+                 
+foreign import ccall unsafe "FlyCapture2_C.h fc2AVIOpen"
+  fc2AVIOpen :: AVIContext -> Ptr CChar -> Ptr AVIOption -> IO Error
+
+foreign import ccall unsafe "FlyCapture2_C.h fc2CreateAVI"
+  fc2CreateAVI :: Ptr AVIContext -> IO Error
+                  
+foreign import ccall unsafe "FlyCapture2_C.h fc2DestroyAVI"
+  fc2DestroyAVI :: AVIContext -> IO Error
+
 ctoJImage :: CImage -> IO B.ByteString -- IO DynamicImage
 ctoJImage (CImage r c _ p _ _ _ _ ) = do
   let h = fromIntegral r
@@ -330,22 +354,4 @@ ctoJImage (CImage r c _ p _ _ _ _ ) = do
   let arr = map (fromIntegral) a 
   let bs = B.pack arr
   return bs
-  -- let bs = fromForeignPtr fp 0 (r*c) -- foreign pointer to byte string
-  {-let i = (decodeImage bs) --byte string to (juicypixels) imagei
-  case i of 
-    Right img -> return img
-    Left _ -> error "could not get image" 
-  -}
-    
-  
-{-
-  **what should I do with these ones?
-   CVCapture ??
-   PrintErrorTrace ... fc2ErrorToDescription ??
  
-   **do I need this function?? 
-   fc2imageEventCallback
-   
-   **TODO:
-   test/see if this works
-   look for more functions to bind (like the ones in the test file)/make it work -}

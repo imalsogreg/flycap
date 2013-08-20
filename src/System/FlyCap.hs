@@ -24,11 +24,20 @@ module System.FlyCap ( VideoMode (..)
                      , fc2CreateImage
                      , fc2RetrieveBuffer
                      , destroyImage  
+                     , createContexts  
+                     , createMore
+                     , destroyAVI
+                     , createAVIContext
+                     , makeAVIOption
+                     , openAVI
+                     , closeAVI  
+                     , appendAVI  
                      ) where
 
 import qualified System.FlyCap.FlyCapBase as FlyCapBase
 import Foreign
 import Foreign.C.Types
+import Foreign.C.String
 import Foreign.ForeignPtr.Safe
 import Foreign.C.Error
 import System.FlyCap.FlyCapBase hiding (Context)
@@ -84,7 +93,6 @@ hConnect c guid =
     poke pG guid
     (throwErrnoIf_ (/=0) ("connect")
      (fc2Connect c pG))
-
     return ()
 
 hLibVersion :: IO Version
@@ -107,13 +115,13 @@ hSetVMandFR c vidMode frameRate = do
   _ <- fc2SetVideoModeAndFrameRate c (vmToC vidMode) (frToC frameRate)
   return ()
   
-hStartSCapture :: Int -> Context -> IO ()
+hStartSCapture :: Int -> [Context] -> IO ()
 hStartSCapture i c =
-  alloca $ \ptr -> do
-    poke ptr c
-    (throwErrnoIf_ (/=0) ("start capture")
-     (fc2StartSyncCapture (fromIntegral i) ptr))
-    return ()
+  allocaArray i $ \ptr -> do
+    pokeArray ptr c
+    e <- fc2StartSyncCapture (fromIntegral i) ptr
+    if i == 0 then return ()
+      else print $ "error from start sync capture is: " ++ show e
 
 hRetrieveBuffer :: Context -> IO FCImage
 hRetrieveBuffer c  =
@@ -196,3 +204,59 @@ destroyImage im = do
     if e == 0 then return () else
                                   print $ "error from destroying image is: " ++ (show e)
                                   --return ()
+
+createContexts :: IO [Context]
+createContexts = do
+  c <- (hCreateC :: IO Context)
+  n <- hGetNum c
+  let l = (c:[])
+  createMore n 1 l
+  
+createMore :: Int -> Int -> [Context] -> IO [Context]
+createMore n l c = do
+  if n == l then return c
+    else do
+      cNew <- hCreateC
+      createMore n (l+1) (cNew:c)
+      
+appendAVI :: AVIContext -> CImage -> IO ()
+appendAVI c image = do
+  alloca $ \ptr -> do
+    poke ptr image
+    e <- fc2AVIAppend c ptr
+    if e == 0 then return ()
+      else print $ "error from append AVI is: " ++ (show e)
+
+closeAVI :: AVIContext -> IO ()
+closeAVI c = do
+  e <- fc2AVIClose c
+  if e == 0 then return ()
+    else print ("Error for Close AVI is: " ++ show e)
+
+openAVI :: AVIContext -> String -> AVIOption -> IO ()
+openAVI c n o = do
+  cstring <- newCString n
+  alloca $ \optPtr -> do
+    poke optPtr o
+    e  <- fc2AVIOpen c cstring optPtr
+    if e == 0 then return ()
+      else print $ "Error for Open AVI is: " ++ (show e)
+  
+makeAVIOption :: Double  -> IO AVIOption
+makeAVIOption fr = do
+  let cFR = (realToFrac fr :: CFloat)
+  ptr <- mallocArray 256 
+  return AVIOption {frameRate = cFR, reservedList = ptr}
+  
+createAVIContext :: IO AVIContext
+createAVIContext = 
+  alloca $ \ptr -> do
+    e <- fc2CreateAVI ptr
+    print $ "error from avi context is: " ++ (show e)
+    peek ptr
+           
+destroyAVI :: AVIContext -> IO ()
+destroyAVI c = do
+  e <- fc2DestroyAVI c
+  if e == 0 then return ()
+    else print $ "Error for Destroy AVI is: " ++ (show e)
