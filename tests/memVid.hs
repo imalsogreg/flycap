@@ -26,9 +26,9 @@ main = do
     -- im <-getImage  i -- gives us a JImage with Y8 Pixel
     --let image = (JPTypes.promoteImage im :: JPTypes.Image JPTypes.PixelRGB8) --change to RGB8 Pixel
     t <- loadTex i tex
+    destroyImage i
     display t
     -- deleting image: 
-    destroyImage i
     GLFW.swapBuffers win
  
 getT :: CImage -> IO ()  
@@ -87,7 +87,7 @@ resize _ width height = do
   viewport $=( (Position 0 0), (Size (fromIntegral width) (fromIntegral height)))
   matrixMode $= Projection 
   loadIdentity
-  ortho (-1.0) 1.0 (-1.0) 1.0 (-1) (1 :: GLdouble)
+  ortho (-10.0) 10.0 (-1.0) 1.0 (-1) (1 :: GLdouble)
   matrixMode $= Modelview 0
   flush
   
@@ -109,12 +109,15 @@ keyPressed :: Context -> GLFW.KeyCallback
 keyPressed c win GLFW.Key'Escape _ GLFW.KeyState'Pressed _ = shutdown c win
 keyPressed _  _ _ _ _ _ = return ()
 
---shutdown :: GLFW.WindowCloseCallback
+shutdown :: [Context] -> GLFW.WindowCloseCallback
 shutdown c win = do
+  print "shutdown"
+  cameraStop c
   GLFW.destroyWindow win
   GLFW.terminate
   exitWith ExitSuccess
-  cameraStop c
+  print "shutdown after exit"
+
 
 
 --TODO :

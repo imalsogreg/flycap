@@ -52,6 +52,11 @@ import qualified Codec.Picture.Types as JPTypes
 
 type Context = FlyCapBase.Context
 
+-- TODO: import CV, make type synonyms to clarify that Capture refers
+-- to AVI files and Context refers to individual cameras
+data CaptureHandle = AVISetHandle [Capture]
+                   | CameraSetHandle [Context]
+
 data FCImage = FCImage
                Int -- ^ column count (width)
                Int -- ^ row count    (height)
@@ -257,3 +262,16 @@ destroyAVI c = do
   e <- fc2DestroyAVI c
   if e == 0 then return ()
     else print $ "Error for Destroy AVI is: " ++ (show e)
+               
+-- continue this
+fromAVI = do 
+  makeWindow "testing"
+  cap <- captureFromFile "testingavi-0000.avi"
+  forM [1..20] $ \i -> do
+    Just im <- getFrame cap
+    showImage "newim" im
+    waitKey (fromIntegral 5)
+    return ()
+  waitKey 0
+  destroyWindow "testing"
+
