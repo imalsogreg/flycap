@@ -65,11 +65,8 @@ hCreateC =
 
 hGetCamIndex :: Context -> Int -> IO PGRGuid
 hGetCamIndex c i =
-  alloca $ \ptr -> do
-    (throwErrnoIf_ (/=0) ("get camera index")
-     (fc2GetCameraFromIndex c (fromIntegral i) ptr))
-    guid <- peek ptr
-    return (guid)
+  alloca $ \ptr -> (throwErrnoIf_ (/=0) ("get camera index")
+                    (fc2GetCameraFromIndex c (fromIntegral i) ptr)) >> peek ptr
     
 hGetCamSerial :: Context -> Int -> IO PGRGuid
 hGetCamSerial c i = 
