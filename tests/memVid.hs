@@ -4,15 +4,7 @@ import Control.Concurrent
 import Data.IORef
 import Graphics.UI.GLFW as GLFW
 import System.Exit (exitWith, ExitCode (..))
---import qualified Data.Vector.Storable as VS
---import qualified Codec.Picture as JP
---import qualified Codec.Picture.Types as JPTypes
 import System.FlyCap
-
--- only one retrieve buffer per cycle
--- forever 30 frames a second using thread delay
--- look at c api and figure out how retrieve buffer behaves
--- look at other examples (c++ flycap)
 
 main = do
   c <- hCreateC
@@ -26,15 +18,15 @@ main = do
   --GLFW.setWindowRefreshCallback win (Just display)
   GLFW.setFramebufferSizeCallback win (Just resize)
   GLFW.setWindowCloseCallback win (Just (shutdown c))
-  initGL
+  tex <- initGL
   forever $ do
     GLFW.pollEvents
     i <- hRetBuff c -- gives us a CImage 
     --old system using hRetrieveBuffer, which gives us an FCImage, and JuicyPixels
     -- im <-getImage  i -- gives us a JImage with Y8 Pixel
     --let image = (JPTypes.promoteImage im :: JPTypes.Image JPTypes.PixelRGB8) --change to RGB8 Pixel
-    tex <- loadTex i
-    display tex
+    t <- loadTex i tex
+    display t
     -- deleting image: 
     destroyImage i
     GLFW.swapBuffers win
@@ -69,13 +61,12 @@ display tex = do
   flush
 
 --loadTex :: JP.Image JPTypes.PixelRGB8 -> IO TextureObject (old system)
-loadTex :: CImage -> IO TextureObject
-loadTex im = do
-  texobj <- genObjectNames 1 -- get a list of exactly 1 texture object
-  textureBinding Texture2D $= Just (head texobj)
+loadTex :: CImage -> TextureObject -> IO TextureObject
+loadTex im tex = do
+  textureBinding Texture2D $= Just (tex)
   textureFilter Texture2D $= ((Nearest, Nothing), Nearest)
   getT im -- put the image into the texture
-  return $ head texobj
+  return $  tex
  
 cameraInit c= do
   num <- hGetNum c
@@ -100,7 +91,7 @@ resize _ width height = do
   matrixMode $= Modelview 0
   flush
   
-initGL :: IO ()
+initGL :: IO TextureObject
 initGL = do
   GLFW.windowHint $ WindowHint'RedBits 8
   GLFW.windowHint $ WindowHint'GreenBits 8
@@ -109,8 +100,10 @@ initGL = do
   matrixMode $= Projection
   loadIdentity
   matrixMode $= Modelview 0
+  texs <- genObjectNames 1
+  let tex = head texs
   flush
-  return ()
+  return tex
 
 keyPressed :: Context -> GLFW.KeyCallback
 keyPressed c win GLFW.Key'Escape _ GLFW.KeyState'Pressed _ = shutdown c win
@@ -125,5 +118,5 @@ shutdown c win = do
 
 
 --TODO :
--- make it show more than 10 frames at a time!!!
+
 -- add more keys pressed options
