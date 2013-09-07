@@ -32,6 +32,7 @@ module System.FlyCap ( VideoMode (..)
                      , openAVI
                      , closeAVI  
                      , appendAVI  
+                     , fromAVI 
                      ) where
 
 import qualified System.FlyCap.FlyCapBase as FlyCapBase
@@ -40,6 +41,9 @@ import Foreign.C.Types
 import Foreign.C.String
 import Foreign.ForeignPtr.Safe
 import Foreign.C.Error
+import Control.Monad
+import AI.CV.OpenCV.CV
+import AI.CV.OpenCV.HighGui
 import System.FlyCap.FlyCapBase hiding (Context)
 import qualified Data.Vector.Storable as VS
 import qualified Codec.Picture as JP
@@ -147,6 +151,28 @@ hRetrieveBuffer c  =
         nC = fromIntegral $ cols cImage
     return $
       FCImage nC nR (VS.unsafeFromForeignPtr cImageDataF 0 (nC * nR))
+
+makeAVI ::Maybe Int -> Double -> String -> Context -> IO ()
+--takes in (maybe) the number of frames, the frame rate, and a string that will be the avi file name
+--should I have it create a context and not take in one?
+makeAVI mayb fr name c = do
+  ac <- createAVIContext
+  option <- makeAVIOption 30.0
+  openAVI ac name option
+  case mayb of 
+    (Just n) -> replicateM_ n (hRetBuff c >>= \i -> appendAVI ac i >> destroyImage i)
+    Nothing -> forever (hRetBuff c >>= \i -> appendAVI ac i >> destroyImage i)--while no exception?
+  closeAVI ac
+  destroyAVI ac
+
+getImage :: (Maybe Context) -> (Maybe (Ptr CvCapture)) -> IO CImage
+getImage mayCont mayCap = do
+  case mayCont of Just context -> hRetBuff context
+                  Nothing -> 
+                    case mayCap of Just pcapture -> do
+                                     ptrimage <- cvQueryFrame pcapture 
+                                     (IplImage ) <- peek ptrimage
+                                     
 
 hRetBuff :: Context -> IO CImage
 hRetBuff c =
@@ -265,7 +291,7 @@ destroyAVI c = do
     else print $ "Error for Destroy AVI is: " ++ (show e)
          
          
--- continue this
+-- continue this, only use opengl now
 fromAVI = do 
   makeWindow "testing"
   cap <- captureFromFile "testingavi-0000.avi"

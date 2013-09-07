@@ -4,7 +4,7 @@ import System.FlyCap
 import Control.Monad
 
 main = do 
-  c <- hCreateC
+ {- c <- hCreateC
   pgr <- hGetCamIndex c 0
   hConnect c pgr
   hSetVMandFR c  VM800x600_Y8  Fr_30
@@ -18,4 +18,6 @@ main = do
   hStopCapture c
   hDisconnect c
   hDestroyContext c
+-}
+  fromAVI
   return ()
