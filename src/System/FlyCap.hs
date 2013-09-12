@@ -32,6 +32,8 @@ module System.FlyCap ( VideoMode (..)
                      , openAVI
                      , closeAVI  
                      , appendAVI  
+                     , fromAVI
+                     , cvLoadImage  
                      ) where
 
 import qualified System.FlyCap.FlyCapBase as FlyCapBase
@@ -40,6 +42,12 @@ import Foreign.C.Types
 import Foreign.C.String
 import Foreign.ForeignPtr.Safe
 import Foreign.C.Error
+import Control.Monad
+import CV.HighGUI
+import CV.Video
+import CV.Image
+import CV.Conversions
+import Data.Array.CArray.Base
 import System.FlyCap.FlyCapBase hiding (Context)
 import qualified Data.Vector.Storable as VS
 import qualified Codec.Picture as JP
@@ -147,6 +155,34 @@ hRetrieveBuffer c  =
     return $
       FCImage nC nR (VS.unsafeFromForeignPtr cImageDataF 0 (nC * nR))
 
+makeAVI ::Maybe Int -> Double -> String -> Context -> IO ()
+--takes in (maybe) the number of frames, the frame rate, and a string that will be the avi file name
+makeAVI mayb fr name c = do
+  ac <- createAVIContext
+  option <- makeAVIOption 30.0
+  openAVI ac name option
+  case mayb of 
+    (Just n) -> replicateM_ n (hRetBuff c >>= \i -> appendAVI ac i >> destroyImage i)
+    Nothing -> forever (hRetBuff c >>= \i -> appendAVI ac i >> destroyImage i)--while no exception?
+  closeAVI ac
+  destroyAVI ac
+
+retImage :: (Maybe Context) -> (Maybe (Ptr Capture)) -> IO CImage
+retImage mayCont mayCap = do
+  case mayCont of Just context -> hRetBuff context
+                  Nothing -> case mayCap of Just pcapture -> cvLoadImage
+                                            Nothing -> print ("error, cannot retrieve images")
+                                     
+cvLoadImage :: Ptr Capture -> IO () --IO CImage
+cvLoadImage pcapture = do
+   ptrimage <- cvQueryFrame pcapture 
+   imageD8 <- peek ptrimage
+   let imageD32 = unsafeImageTo32F imageD8
+   let (CArray (nx, ny) values) = copyImageToFCArray imageD32
+   print $ peek values
+  -- showImage (fromIntegral w) image
+   return ()
+  
 hRetBuff :: Context -> IO CImage
 hRetBuff c =
   alloca $ \ptrImage -> do
@@ -262,8 +298,8 @@ destroyAVI c = do
   e <- fc2DestroyAVI c
   if e == 0 then return ()
     else print $ "Error for Destroy AVI is: " ++ (show e)
-               
--- continue this
+         
+-- continue this, only use opengl now
 fromAVI = do 
   makeWindow "testing"
   cap <- captureFromFile "testingavi-0000.avi"
