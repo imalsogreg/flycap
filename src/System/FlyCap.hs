@@ -32,7 +32,8 @@ module System.FlyCap ( VideoMode (..)
                      , openAVI
                      , closeAVI  
                      , appendAVI  
-                     , fromAVI 
+                     , fromAVI
+                     , cvLoadImage  
                      ) where
 
 import qualified System.FlyCap.FlyCapBase as FlyCapBase
@@ -42,8 +43,11 @@ import Foreign.C.String
 import Foreign.ForeignPtr.Safe
 import Foreign.C.Error
 import Control.Monad
-import AI.CV.OpenCV.CV
-import AI.CV.OpenCV.HighGui
+import CV.HighGUI
+import CV.Video
+import CV.Image
+import CV.Conversions
+import Data.Array.CArray.Base
 import System.FlyCap.FlyCapBase hiding (Context)
 import qualified Data.Vector.Storable as VS
 import qualified Codec.Picture as JP
@@ -154,7 +158,6 @@ hRetrieveBuffer c  =
 
 makeAVI ::Maybe Int -> Double -> String -> Context -> IO ()
 --takes in (maybe) the number of frames, the frame rate, and a string that will be the avi file name
---should I have it create a context and not take in one?
 makeAVI mayb fr name c = do
   ac <- createAVIContext
   option <- makeAVIOption 30.0
@@ -165,15 +168,22 @@ makeAVI mayb fr name c = do
   closeAVI ac
   destroyAVI ac
 
-getImage :: (Maybe Context) -> (Maybe (Ptr CvCapture)) -> IO CImage
-getImage mayCont mayCap = do
+retImage :: (Maybe Context) -> (Maybe (Ptr Capture)) -> IO CImage
+retImage mayCont mayCap = do
   case mayCont of Just context -> hRetBuff context
-                  Nothing -> 
-                    case mayCap of Just pcapture -> do
-                                     ptrimage <- cvQueryFrame pcapture 
-                                     (IplImage ) <- peek ptrimage
+                  Nothing -> case mayCap of Just pcapture -> cvLoadImage
+                                            Nothing -> print ("error, cannot retrieve images")
                                      
-
+cvLoadImage :: Ptr Capture -> IO () --IO CImage
+cvLoadImage pcapture = do
+   ptrimage <- cvQueryFrame pcapture 
+   imageD8 <- peek ptrimage
+   let imageD32 = unsafeImageTo32F imageD8
+   let (CArray (nx, ny) values) = copyImageToFCArray imageD32
+   print $ peek values
+  -- showImage (fromIntegral w) image
+   return ()
+  
 hRetBuff :: Context -> IO CImage
 hRetBuff c =
   alloca $ \ptrImage -> do
