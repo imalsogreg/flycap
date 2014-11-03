@@ -167,21 +167,23 @@ makeAVI mayb fr name c = do
   closeAVI ac
   destroyAVI ac
 
+
 retImage :: (Maybe Context) -> (Maybe (Ptr Capture)) -> IO CImage
 retImage mayCont mayCap = do
   case mayCont of Just context -> hRetBuff context
-                  Nothing -> case mayCap of Just pcapture -> cvLoadImage
+                  Nothing -> case mayCap of Just pcapture -> cvLoadImage pcapture
                                             Nothing -> print ("error, cannot retrieve images")
                                      
-cvLoadImage :: Ptr Capture -> IO () --IO CImage
+cvLoadImage :: Ptr Capture -> IO CImage
 cvLoadImage pcapture = do
    ptrimage <- cvQueryFrame pcapture 
    imageD8 <- peek ptrimage
-   let imageD32 = unsafeImageTo32F imageD8
-   let (CArray (nx, ny) values) = copyImageToFCArray imageD32
-   print $ peek values
-  -- showImage (fromIntegral w) image
-   return ()
+   let imageD32 = unsafeImageTo32F (S imageD8)
+       (nRow,nCol) = getSize imageD32
+   let (CArray ind0 indn n values) = copyImageToFCArray imageD32
+   withForeignPtr values $ \v -> do
+     return $ CImage nRow nCol 
+
   
 hRetBuff :: Context -> IO CImage
 hRetBuff c =

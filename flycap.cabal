@@ -28,6 +28,7 @@ Library
     , vector
     , JuicyPixels (>=3.1 && < 4.0)
     , carray
+    , CV
   extra-lib-dirs: /usr/lib
   extra-libraries: flycapture-c
   include-dirs: /usr/include/flycapture/C
