@@ -175,7 +175,7 @@ instance Storable CamInfo where
 
 data CImage = CImage { rows        :: CUInt
                      , cols        :: CUInt  
-                     , stride      :: CUInt  
+                     , stride      :: CUInt  -- What is stride?
                      , pData       :: Ptr CUChar  
                      , dataSize    :: CUInt  
                      , format      :: CInt -- an fc2PixelFormat enum
