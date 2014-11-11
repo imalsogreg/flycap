@@ -7,7 +7,7 @@ import Foreign.C.Types
 import Foreign.Ptr
 import Codec.Picture
 import qualified Data.ByteString as B
-import Control.Monad
+
 
 #include <FlyCapture2_C.h>
 

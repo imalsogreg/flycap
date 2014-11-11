@@ -11,7 +11,7 @@ Bug-Reports:        https://github.com/ImAlsoGreg/hFlyCapture/issues
 Category:           Graphics
 Build-Type:         Simple
 Synopsis:           Haskell Bindings to FlyCapture2 SDK from Point Grey
-Cabal-Version:      >=1.8
+Cabal-Version:      >=1.10
 Extra-Source-Files: README.md
                   , tests/*.hs
 Description:
@@ -19,16 +19,17 @@ Description:
 
 Source-Repository head
   Type:     git
-  Location: git://github.com/ImAlsoGreg/hFlyCapture.git
+  Location: git://github.com/imalsogreg:flycap.git
 
 Library
+  Build-Tools:        c2hs
+  Default-Language:    Haskell2010
   Build-Depends:
     base     (>= 4 && <= 5)
     , bytestring
     , vector
     , JuicyPixels (>=3.1 && < 4.0)
     , carray
-    , CV
   extra-lib-dirs: /usr/lib
   extra-libraries: flycapture-c
   include-dirs: /usr/include/flycapture/C
@@ -40,7 +41,7 @@ Library
     System.FlyCap.FlyCapBase
   Ghc-Options: -Wall
 
-Executable aviToAvi
-  Hs-Source-Dirs: tests
-  Main-Is: aviToAvi.hs
-  Build-Depends: flycap, base, CV
+--Executable aviToAvi
+--  Hs-Source-Dirs: tests
+--  Main-Is: aviToAvi.hs
+--  Build-Depends: flycap, base, CV

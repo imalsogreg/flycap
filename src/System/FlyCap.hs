@@ -14,8 +14,8 @@ module System.FlyCap ( VideoMode (..)
                      , hSetVMandFR
                      , hStartSCapture
                      , hRetrieveBuffer
-                     , hStartCapture
-                     , hStopCapture
+--                     , hStartCapture
+--                     , hStopCapture
                      , hGetImageData
                      , hDisconnect
                      , getDynamicImage
@@ -24,30 +24,30 @@ module System.FlyCap ( VideoMode (..)
                      , fc2CreateImage
                      , fc2RetrieveBuffer
                      , destroyImage  
-                     , createContexts  
-                     , createMore
-                     , destroyAVI
-                     , createAVIContext
-                     , makeAVIOption
-                     , openAVI
-                     , closeAVI  
-                     , appendAVI  
-                     , fromAVI
-                     , cvLoadImage  
+--                     , createContexts  
+--                     , createMore
+
+
+
+
+
+
+
+
                      ) where
 
 import qualified System.FlyCap.FlyCapBase as FlyCapBase
 import Foreign
 import Foreign.C.Types
-import Foreign.C.String
-import Foreign.ForeignPtr.Safe
+
+
 import Foreign.C.Error
-import Control.Monad
-import CV.HighGUI
-import CV.Video
-import CV.Image
-import CV.Conversions
-import Data.Array.CArray.Base
+
+--import CV.HighGUI
+--import CV.Video
+--import CV.Image
+--import CV.Conversions
+
 import System.FlyCap.FlyCapBase hiding (Context)
 import qualified Data.Vector.Storable as VS
 import qualified Codec.Picture as JP
@@ -62,8 +62,8 @@ type Context = FlyCapBase.Context
 
 -- TODO: import CV, make type synonyms to clarify that Capture refers
 -- to AVI files and Context refers to individual cameras
-data CaptureHandle = AVISetHandle [Capture]
-                   | CameraSetHandle [Context]
+--data CaptureHandle = AVISetHandle [Capture]
+--                   | CameraSetHandle [Context]
 
 data FCImage = FCImage
                Int -- ^ column count (width)
@@ -112,6 +112,7 @@ hLibVersion =
     ver <- peek ptrV
     return ver
     
+-- BROKEN
 hGetCamInfo :: Context -> IO CamInfo
 hGetCamInfo c = 
   alloca $ \ptrCI -> do
@@ -124,7 +125,8 @@ hSetVMandFR :: Context -> VideoMode -> FrameRate -> IO ()
 hSetVMandFR c vidMode frameRate = do 
   _ <- fc2SetVideoModeAndFrameRate c (vmToC vidMode) (frToC frameRate)
   return ()
-  
+
+
 hStartSCapture :: Int -> [Context] -> IO ()
 hStartSCapture i c =
   allocaArray i $ \ptr -> do
@@ -132,6 +134,8 @@ hStartSCapture i c =
     e <- fc2StartSyncCapture (fromIntegral i) ptr
     if i == 0 then return ()
       else print $ "error from start sync capture is: " ++ show e
+
+
 
 hRetrieveBuffer :: Context -> IO FCImage
 hRetrieveBuffer c  =
@@ -155,6 +159,7 @@ hRetrieveBuffer c  =
     return $
       FCImage nC nR (VS.unsafeFromForeignPtr cImageDataF 0 (nC * nR))
 
+{-
 makeAVI ::Maybe Int -> Double -> String -> Context -> IO ()
 --takes in (maybe) the number of frames, the frame rate, and a string that will be the avi file name
 makeAVI mayb fr name c = do
@@ -173,7 +178,8 @@ retImage mayCont mayCap = do
   case mayCont of Just context -> hRetBuff context
                   Nothing -> case mayCap of Just pcapture -> cvLoadImage pcapture
                                             Nothing -> print ("error, cannot retrieve images")
-                                     
+
+
 cvLoadImage :: Ptr Capture -> IO CImage
 cvLoadImage pcapture = do
    ptrimage <- cvQueryFrame pcapture 
@@ -183,7 +189,7 @@ cvLoadImage pcapture = do
    let (CArray ind0 indn n values) = copyImageToFCArray imageD32
    withForeignPtr values $ \v -> do
      return $ CImage nRow nCol 
-
+-}
   
 hRetBuff :: Context -> IO CImage
 hRetBuff c =
@@ -193,6 +199,7 @@ hRetBuff c =
     (CImage r c str pData dS f bF iI) <- peek ptrImage
     return (CImage r c str pData dS f bF iI)
 
+{-
 hStartCapture :: Context -> IO ()
 hStartCapture c = do
   throwErrnoIf_ (/=0) "Start capture failure" (fc2StartCapture c)
@@ -202,7 +209,8 @@ hStopCapture c = do
   (throwErrnoIf_ (/=0) ("stop capture")
    (fc2StopCapture c))
   return ()
-  
+-}  
+
 hGetImageData :: CImage -> IO ImageData
 hGetImageData image = 
   alloca $ \ptrID -> do 
@@ -244,7 +252,7 @@ destroyImage im = do
     if e == 0 then return () else
                                   print $ "error from destroying image is: " ++ (show e)
                                   --return ()
-
+{-
 createContexts :: IO [Context]
 createContexts = do
   c <- (hCreateC :: IO Context)
@@ -258,7 +266,8 @@ createMore n l c = do
     else do
       cNew <- hCreateC
       createMore n (l+1) (cNew:c)
-      
+
+
 appendAVI :: AVIContext -> CImage -> IO ()
 appendAVI c image = do
   alloca $ \ptr -> do
@@ -313,3 +322,4 @@ fromAVI = do
   waitKey 0
   destroyWindow "testing"
 
+-}
