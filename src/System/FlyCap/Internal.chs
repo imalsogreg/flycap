@@ -27,13 +27,22 @@ type ImageData = Ptr CUChar
 
 newtype Guid = Guid Int
 
-{#pointer *fc2PGRGuid as GuidPtr -> Guid #}
+{#pointer *fc2PGRGuid as GuidPtr -> Guid #}                                                                                  
 
-data Version = Version{ major'Version ::Int
-                      , minor'Version ::Int
-                      , type'Version  ::Int
-                      , build'Version ::Int
+data Version = Version{ major'Version :: Int
+                      , minor'Version :: Int
+                      , type'Version  :: Int
+                      , build'Version :: Int
                       } deriving (Eq, Show)
+
+instance Storable Version where
+  sizeof _    = {#sizeof Version #}
+  alignment _ = 4
+  peek p = Version
+           <$> liftM fromIntegral ({#get fc2Version->major #} p)
+           <*> liftM fromIntegral ({#get fc2Version->minor #} p)
+           <*> liftM fromIntegral ({#get fc2Version->type  #} p)
+           <*> liftM fromIntegral ({#get fc2Version->build #} p)
 
 {#pointer *fc2Version as VersionPtr -> Version #}
 
