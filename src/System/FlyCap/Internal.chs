@@ -44,7 +44,7 @@ instance Storable Version where
            <*> liftM fromIntegral ({#get fc2Version->type  #} p)
            <*> liftM fromIntegral ({#get fc2Version->build #} p)
   poke p v = do
-    
+    {#set fc2Version->major #} p (fromIntegral $ major'Version v)
 
 {#pointer *fc2Version as VersionPtr -> Version #}
 
