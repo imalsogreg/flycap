@@ -43,6 +43,8 @@ instance Storable Version where
            <*> liftM fromIntegral ({#get fc2Version->minor #} p)
            <*> liftM fromIntegral ({#get fc2Version->type  #} p)
            <*> liftM fromIntegral ({#get fc2Version->build #} p)
+  poke p v = do
+    
 
 {#pointer *fc2Version as VersionPtr -> Version #}
 
