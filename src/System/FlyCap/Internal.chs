@@ -112,14 +112,14 @@ data IPAddress  = IPAddress  Char Char Char Char
 {#pointer *fc2MACAddress as MacAddressPtr -> MacAddress #}
 {#pointer *fc2IPAddress  as IPAddressPtr  -> IPAddress  #}
 
-data CImage = CImage { rows        :: CUInt
-                     , cols        :: CUInt  
-                     , stride      :: CUInt  -- What is stride?
-                     , pData       :: Ptr CUChar  
-                     , dataSize    :: CUInt  
-                     , format      :: CInt -- an fc2PixelFormat enum
-                     , bayerFormat :: CInt -- an enum
-                     , imageIMPl   :: Ptr ()  
+data CImage = CImage { imgHeight :: Int
+                     , imgWidth  :: Int
+                     , imgStride      :: CUInt  -- What is stride?
+                     , imgData       :: BS.ByteString
+                     , imgDataSize :: Int
+                     , imgFormat      :: CInt -- an fc2PixelFormat enum
+                     , imgBayerFormat :: FlyCapBayerTileFormat
+                     , imgIMPl   :: Ptr ()  
                      } deriving (Show)
               
 instance Storable CImage where
