@@ -25,20 +25,21 @@ Library
   Build-Tools:        c2hs
   Default-Language:    Haskell2010
   Build-Depends:
-    base     (>= 4 && <= 5)
+      base     (>= 4 && <= 5)
     , bytestring
-    , vector
-    , JuicyPixels (>=3.1 && < 4.0)
     , carray
+    , JuicyPixels (>=3.1 && < 4.0)
+    , transformers
+    , vector 
+
   extra-lib-dirs: /usr/lib
   extra-libraries: flycapture-c
   include-dirs: /usr/include/flycapture/C
   Hs-Source-Dirs: src
-  Other-Modules: 
---    System.FlyCap.FlyCapBase
   Exposed-Modules:
     System.FlyCap
-    System.FlyCap.FlyCapBase
+    System.FlyCap.Internal
+    System.FlyCap.AVI
   Ghc-Options: -Wall
 
 --Executable aviToAvi

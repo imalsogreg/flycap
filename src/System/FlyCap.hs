@@ -36,7 +36,7 @@ module System.FlyCap ( VideoMode (..)
 
                      ) where
 
-import qualified System.FlyCap.FlyCapBase as FlyCapBase
+import qualified System.FlyCap.Internal as FlyCapBase
 import Foreign
 import Foreign.C.Types
 
@@ -48,7 +48,7 @@ import Foreign.C.Error
 --import CV.Image
 --import CV.Conversions
 
-import System.FlyCap.FlyCapBase hiding (Context)
+import System.FlyCap.Internal hiding (Context)
 import qualified Data.Vector.Storable as VS
 import qualified Codec.Picture as JP
 import qualified Codec.Picture.Types as JPTypes

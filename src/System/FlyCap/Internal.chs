@@ -1,177 +1,116 @@
-{-# LANGUAGE ForeignFunctionInterface, CPP #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
-module System.FlyCap.FlyCapBase where
+module System.FlyCap.Internal where
 
+import Control.Monad.Trans.Reader
 import Foreign
 import Foreign.C.Types
 import Foreign.Ptr
 import Codec.Picture
+import GHC.Word
 import qualified Data.ByteString as B
 
 
 #include <FlyCapture2_C.h>
+#include <FlyCapture2Defs_C.h>
+
+newtype FlyCap a = FlyCap { unFlyCap :: ReaderT Context IO a }
+  deriving (MonadReader Context, Monad, Applicative, Functor)
 
 -- raw c imports here
 
 type Context = Ptr () --fc2Context is a void pointer in C
-type Error = CInt
+
+{#enum fc2Error as FlyCapError {underscoreToCase} deriving (Show,Eq) #}
+
 type ImageData = Ptr CUChar
-type AVIContext = Ptr ()
-data  AVIOption = AVIOption {frameRate :: CFloat, reservedList :: Ptr CUInt} 
-instance Storable AVIOption where
-  sizeOf _ = (#size fc2AVIOption)
-  alignment _ = alignment (undefined :: CFloat)
-  peek ptr = do
-    fr <- (#peek fc2AVIOption, frameRate) ptr
-    res <- (#peek fc2AVIOption, reserved) ptr
-    return AVIOption {frameRate = fr, reservedList = res}
-  poke ptr (AVIOption fr res) = do
-    (#poke fc2AVIOption, frameRate) ptr fr
-    (#poke fc2AVIOption, reserved) ptr res
-    
-data PGRGuid = PGRGuid {value :: [CUInt]} deriving (Show) --fc2PGRGuid a structure that 'holds' an unsigned int in C
-instance Storable PGRGuid  where
-  sizeOf _ = (#size fc2PGRGuid)
-  alignment _ = alignment (undefined :: CUInt)
-  peek ptr = do
-    --val <- replicateM 4 $ (#peek fc2PGRGuid, value) ptr
-    val <- (peekArray 4 ((#ptr fc2PGRGuid, value) ptr))
-    return PGRGuid {value = val}
 
-  poke ptr (PGRGuid val)  = do
-   pokeArray ((#ptr fc2PGRGuid, value)  ptr) val
+newtype Guid = Guid Int
 
-data Version = Version{ mJ ::CUInt, mN :: CUInt, t :: CUInt, b :: CUInt}
-instance Storable Version where
-  sizeOf _ = ( #size fc2Version)
-  alignment _ = alignment (undefined :: CUInt)
-  peek ptr = do
-    mjr <- (#peek fc2Version, major) ptr
-    mnr <- (#peek fc2Version, minor) ptr
-    typ <- (#peek fc2Version, type) ptr
-    bld <- (#peek fc2Version, build) ptr
-    return Version {mJ = mjr, mN = mnr, t = typ, b = bld}
-  poke ptr (Version mjr mnr typ bld) = do 
-    (#poke fc2Version, major) ptr mjr
-    (#poke fc2Version, minor) ptr mnr
-    (#poke fc2Version, type) ptr typ
-    (#poke fc2Version, build) ptr bld
+{#pointer *fc2PGRGuid as GuidPtr -> Guid #}
 
+data Version = Version{ vMaj ::Int
+                      , vMin ::Int
+                      , vTyp ::Int
+                      , vBld ::Int
+                      } deriving (Eq, Show)
 
-data ConfigRom = ConfigRom {nV :: CUInt, cH :: CUInt, cL :: CUInt, uS :: CUInt, uV :: CUInt, uSV :: CUInt, i0 :: CUInt, i1:: CUInt, i2:: CUInt, i3::  CUInt, key :: CChar, res:: CUInt} deriving (Show)
-instance Storable ConfigRom where
-  sizeOf _ = (#size fc2ConfigROM)
-  alignment _ = alignment (undefined :: CInt)
-  peek ptr = do
-    n <- (#peek fc2ConfigROM, nodeVendorId) ptr
-    h <- (#peek fc2ConfigROM, chipIdHi) ptr
-    l <- (#peek fc2ConfigROM, chipIdLo) ptr
-    s <- (#peek fc2ConfigROM, unitSpecId) ptr
-    v <- (#peek fc2ConfigROM, unitSWVer) ptr
-    sV <- (#peek fc2ConfigROM, unitSubSWVer) ptr
-    u0 <- (#peek fc2ConfigROM, vendorUniqueInfo_0) ptr
-    u1 <- (#peek fc2ConfigROM, vendorUniqueInfo_1) ptr
-    u2 <- (#peek fc2ConfigROM, vendorUniqueInfo_2) ptr
-    u3 <- (#peek fc2ConfigROM, vendorUniqueInfo_3) ptr
-    k <- (#peek fc2ConfigROM, pszKeyword) ptr
-    r <- (#peek fc2ConfigROM, reserved) ptr
-    return ConfigRom { nV = n, cH = h, cL = l, uS = s, uV = v, uSV = sV, i0 = u0, i1 = u1, i2 = u2, i3 = u3, key = k, res = r}
-  poke ptr (ConfigRom n h l s v sV u0 u1 u2 u3 k r) = do
-    (#poke fc2ConfigROM, nodeVendorId) ptr n
-    (#poke fc2ConfigROM, chipIdHi) ptr h
-    (#poke fc2ConfigROM, chipIdLo) ptr l
-    (#poke fc2ConfigROM, unitSpecId) ptr s
-    (#poke fc2ConfigROM, unitSWVer) ptr v
-    (#poke fc2ConfigROM, unitSubSWVer) ptr sV
-    (#poke fc2ConfigROM, vendorUniqueInfo_0) ptr u0
-    (#poke fc2ConfigROM, vendorUniqueInfo_1) ptr u1
-    (#poke fc2ConfigROM, vendorUniqueInfo_2) ptr u2
-    (#poke fc2ConfigROM, vendorUniqueInfo_3) ptr u3
-    (#poke fc2ConfigROM, pszKeyword) ptr k
-    (#poke fc2ConfigROM, reserved) ptr r
+{#pointer *fc2Version as VersionPtr -> Version #}
+
+data ConfigRom = 
+  ConfigRom { confRomVendor        :: Int
+            , confRomChipldH       :: Int
+            , confRomChipldL       :: Int
+            , confRomUnitSpec      :: Int
+            , confRomUnitSWVer     :: Int
+            , confRomUnitSubSWVer  :: Int
+            , confRomVendorUnique0 :: Int
+            , confRomVendorUnique1 :: Int
+            , confRomVendorUnique2 :: Int
+            , convRomVendorUnique3 :: Int
+            , confRomPszKeyword    :: String
+            , confRomReserved      :: Int
+            } deriving (Show)
+
+{#pointer *fc2ConfigROM as ConfigRomPtr -> ConfigRom #}
   
-  
-data CamInfo = CamInfo { serialNum :: CUInt
-                  , iFType :: CInt --technically an enumerator
-                  , colorCam :: Int
-                  , modelName :: CChar
-                  , vendorName :: CChar
-                  , sensorInfo :: CChar
-                  , sensorRes :: CChar
-                  , driverName :: CChar
-                  , firmwareVersion :: CChar  
-                  , firmwareBuildTime :: CChar  
-                  , maxBusSpeed :: CInt --technically an enumerator 
-                  , bayerTileFormat :: CInt -- technically an enumerator
-                  , iidcVer :: CUInt 
-                  , configRom :: ConfigRom
-                  , majorVersion :: CUInt  
-                  , minorVersion :: CUInt  
-                  , userDefName :: CChar  
-                  , xmlURL1 :: CChar  
-                  , xmlURL2 :: CChar  
-                  , macAddress :: CUChar --technically an fc2MACAddress: unsigned char octets[6]
-                  , ipAddress :: CUChar  -- technically an fc2IPAddress: unsigned char octets [4]
-                  , subnetMask :: CUChar -- technically an fc2IPAddress 
-                  , defaultGateway :: CUChar  -- technically an fc2IPAddress
-                  , reserved :: CUInt  
-                  } deriving (Show)
+
+{#enum fc2InterfaceType as FlyCapInterface {underscoreToCase} 
+  deriving (Show, Eq) #}
+
+{#enum fc2DriverType as FlyCapDriver {underscoreToCase}
+  deriving (Show, Eq) #}
+
+{#enum fc2BusSpeed as FlyCapBusSpeed {underscoreToCase}
+  deriving (Show, Eq) #}
+
+{#enum fc2PCIeBusSpeed as FlyCapPCIeBusSpeed {underscoreToCase}
+  deriving (Show, Eq) #}
+
+{#enum fc2BayerTileFormat as FlyCapBayerTileFormat {underscoreToCase}
+  deriving (Show, Eq) #}
+
+{#pointer *fc2CameraInfo as CamInfoPtr -> CamInfo #}
+
+data CamInfo = CamInfo 
+  { camSerialNum       :: Int
+  , camInterface       :: FlyCapInterface
+  , camDriver          :: FlyCapDriver
+  , camIsColor         :: Bool
+  , camModel           :: String
+  , camVendor          :: String
+  , camSensorInfo      :: String
+  , camSensorRes       :: String
+  , camDriverName      :: String
+  , camFirmwareVer     :: String
+  , camFirmwareTBuild  :: String
+  , camMaxBusSpeed     :: FlyCapBusSpeed
+  , camPCIeBusSpeed    :: FlyCapPCIeSpeed
+  , camBayerTileFormat :: FlyCapBayerTileFormat
+  , camBusNumber       :: Int
+  , camNodeNumber      :: Int
+  , camIidcVer         :: Int
+  , camConfigRom       :: ConfigRom
+  , camGigMajorVersion :: Int
+  , camGigMinorVersion :: Int
+  , camUserDefName     :: String
+  , camXmlURL1         :: String
+  , camXmlURL2         :: String
+  , camMacAddress      :: MacAddress
+  , camIPAddress       :: IPAddress 
+  , camSubnetMask      :: IPAddress
+  , camDefaultGateway  :: IPAddress
+  , camCcpStatus       :: Int
+  , camApplicationIP   :: Int
+  , camApplicationPort :: Int
+  , camReserved        :: Int
+  } deriving (Eq, Show)
                
-instance Storable CamInfo where
-  sizeOf _ = ( #size fc2CameraInfo)
-  alignment _ = alignment (undefined :: CDouble)
-  peek ptr = do
-             sN <- (#peek fc2CameraInfo, serialNumber) ptr
-             iT <- (#peek fc2CameraInfo, interfaceType) ptr
-             cC <- (#peek fc2CameraInfo, isColorCamera) ptr
-             modN <- (#peek fc2CameraInfo, modelName) ptr
-             vN <- (#peek fc2CameraInfo, vendorName) ptr
-             sI <- (#peek fc2CameraInfo, sensorInfo) ptr
-             sR <- (#peek fc2CameraInfo, sensorResolution) ptr
-             dN <- (#peek fc2CameraInfo, driverName) ptr
-             fV <- (#peek fc2CameraInfo, firmwareVersion) ptr
-             fBT <- (#peek fc2CameraInfo, firmwareBuildTime) ptr
-             mBS <- (#peek fc2CameraInfo, maximumBusSpeed) ptr
-             bTF <- (#peek fc2CameraInfo, bayerTileFormat) ptr
-             iV <-  (#peek fc2CameraInfo, iidcVer) ptr
-             cR <-  (#peek fc2CameraInfo, configROM) ptr
-             mjV <- (#peek fc2CameraInfo, gigEMajorVersion) ptr 
-             mnV <- (#peek fc2CameraInfo, gigEMinorVersion) ptr
-             uDN <- (#peek fc2CameraInfo, userDefinedName) ptr
-             u1 <- (#peek fc2CameraInfo, xmlURL1) ptr
-             u2 <- (#peek fc2CameraInfo, xmlURL2) ptr
-             mA <- (#peek fc2CameraInfo, macAddress) ptr
-             iA <- (#peek fc2CameraInfo, ipAddress) ptr
-             sM <- (#peek fc2CameraInfo, subnetMask) ptr
-             dG <- (#peek fc2CameraInfo, defaultGateway) ptr
-             r <- (#peek fc2CameraInfo, reserved) ptr
-             return CamInfo { serialNum = sN, iFType = iT, colorCam = cC, modelName = modN, vendorName = vN, sensorInfo = sI,sensorRes = sR, driverName = dN , firmwareVersion = fV, firmwareBuildTime = fBT, maxBusSpeed = mBS, bayerTileFormat = bTF, iidcVer = iV, configRom = cR, majorVersion = mjV, minorVersion = mnV , userDefName = uDN, xmlURL1 = u1, xmlURL2 = u2, macAddress = mA, ipAddress = iA, subnetMask = sM , defaultGateway = dG, reserved = r}
-  poke ptr (CamInfo sN iT cC modN vN sI sR dN fV fBT mBS bTF iV cR mjV mnV uDN u1 u2 mA iA sM dG r) = do 
-    (#poke fc2CameraInfo, serialNumber) ptr sN
-    (#poke fc2CameraInfo, interfaceType) ptr iT
-    (#poke fc2CameraInfo, isColorCamera) ptr cC
-    (#poke fc2CameraInfo, modelName) ptr modN
-    (#poke fc2CameraInfo, vendorName) ptr vN
-    (#poke fc2CameraInfo, sensorInfo) ptr sI
-    (#poke fc2CameraInfo, sensorResolution) ptr sR
-    (#poke fc2CameraInfo, driverName) ptr dN
-    (#poke fc2CameraInfo, firmwareVersion) ptr fV
-    (#poke fc2CameraInfo, firmwareBuildTime) ptr fBT
-    (#poke fc2CameraInfo, maximumBusSpeed) ptr mBS
-    (#poke fc2CameraInfo, bayerTileFormat) ptr bTF
-    (#poke fc2CameraInfo, iidcVer) ptr iV
-    (#poke fc2CameraInfo, configROM) ptr cR
-    (#poke fc2CameraInfo, gigEMajorVersion) ptr mjV 
-    (#poke fc2CameraInfo, gigEMinorVersion) ptr mnV
-    (#poke fc2CameraInfo, userDefinedName) ptr uDN
-    (#poke fc2CameraInfo, xmlURL1) ptr u1
-    (#poke fc2CameraInfo, xmlURL2) ptr u2
-    (#poke fc2CameraInfo, macAddress) ptr mA
-    (#poke fc2CameraInfo, ipAddress) ptr iA
-    (#poke fc2CameraInfo, subnetMask) ptr sM
-    (#poke fc2CameraInfo, defaultGateway) ptr dG
-    (#poke fc2CameraInfo, reserved) ptr r
+data MacAddress = MacAddress Char Char Char Char Char Char
+data IPAddress  = IPAddress  Char Char Char Char
 
+{#pointer *fc2MACAddress as MacAddressPtr -> MacAddress #}
+{#pointer *fc2IPAddress  as IPAddressPtr  -> IPAddress  #}
 
 data CImage = CImage { rows        :: CUInt
                      , cols        :: CUInt  
