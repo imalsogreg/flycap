@@ -29,190 +29,103 @@ newtype Guid = Guid Int
 
 {#pointer *fc2PGRGuid as GuidPtr -> Guid #}
 
-data Version = Version{ vMaj ::Int
-                      , vMin ::Int
-                      , vTyp ::Int
-                      , vBld ::Int
+data Version = Version{ major'Version ::Int
+                      , minor'Version ::Int
+                      , type'Version  ::Int
+                      , build'Version ::Int
                       } deriving (Eq, Show)
 
 {#pointer *fc2Version as VersionPtr -> Version #}
 
 data ConfigRom = 
-  ConfigRom { confRomVendor        :: Int
-            , confRomChipldH       :: Int
-            , confRomChipldL       :: Int
-            , confRomUnitSpec      :: Int
-            , confRomUnitSWVer     :: Int
-            , confRomUnitSubSWVer  :: Int
-            , confRomVendorUnique0 :: Int
-            , confRomVendorUnique1 :: Int
-            , confRomVendorUnique2 :: Int
-            , convRomVendorUnique3 :: Int
-            , confRomPszKeyword    :: String
-            , confRomReserved      :: Int
+  ConfigRom { vendor'ConfigRom        :: Int
+            , chipldH'ConfigRom       :: Int
+            , chipldL'ConfigRom       :: Int
+            , unitSpec'ConfigRom      :: Int
+            , unitSWVer'ConfigRom     :: Int
+            , unitSubSWVer'ConfigRom  :: Int
+            , vendorUnique0'ConfigRom :: Int
+            , vendorUnique1'ConfigRom :: Int
+            , vendorUnique2'ConfigRom :: Int
+            , vendorUnique3'ConfigRom :: Int
+            , pszKeyword'ConfigRom    :: String
+            , reserved'ConfigRom      :: Int
             } deriving (Show)
 
 {#pointer *fc2ConfigROM as ConfigRomPtr -> ConfigRom #}
   
 
-{#enum fc2InterfaceType as FlyCapInterface {underscoreToCase} 
+{#enum fc2InterfaceType as Interface {underscoreToCase} 
   deriving (Show, Eq) #}
 
-{#enum fc2DriverType as FlyCapDriver {underscoreToCase}
+{#enum fc2DriverType as Driver {underscoreToCase}
   deriving (Show, Eq) #}
 
-{#enum fc2BusSpeed as FlyCapBusSpeed {underscoreToCase}
+{#enum fc2BusSpeed as BusSpeed {underscoreToCase}
   deriving (Show, Eq) #}
 
-{#enum fc2PCIeBusSpeed as FlyCapPCIeBusSpeed {underscoreToCase}
+{#enum fc2PCIeBusSpeed as PCIeBusSpeed {underscoreToCase}
   deriving (Show, Eq) #}
 
-{#enum fc2BayerTileFormat as FlyCapBayerTileFormat {underscoreToCase}
+{#enum fc2BayerTileFormat as BayerTileFormat {underscoreToCase}
   deriving (Show, Eq) #}
 
 {#pointer *fc2CameraInfo as CamInfoPtr -> CamInfo #}
 
 data CamInfo = CamInfo 
-  { camSerialNum       :: Int
-  , camInterface       :: FlyCapInterface
-  , camDriver          :: FlyCapDriver
-  , camIsColor         :: Bool
-  , camModel           :: String
-  , camVendor          :: String
-  , camSensorInfo      :: String
-  , camSensorRes       :: String
-  , camDriverName      :: String
-  , camFirmwareVer     :: String
-  , camFirmwareTBuild  :: String
-  , camMaxBusSpeed     :: FlyCapBusSpeed
-  , camPCIeBusSpeed    :: FlyCapPCIeSpeed
-  , camBayerTileFormat :: FlyCapBayerTileFormat
-  , camBusNumber       :: Int
-  , camNodeNumber      :: Int
-  , camIidcVer         :: Int
-  , camConfigRom       :: ConfigRom
-  , camGigMajorVersion :: Int
-  , camGigMinorVersion :: Int
-  , camUserDefName     :: String
-  , camXmlURL1         :: String
-  , camXmlURL2         :: String
-  , camMacAddress      :: MacAddress
-  , camIPAddress       :: IPAddress 
-  , camSubnetMask      :: IPAddress
-  , camDefaultGateway  :: IPAddress
-  , camCcpStatus       :: Int
-  , camApplicationIP   :: Int
-  , camApplicationPort :: Int
-  , camReserved        :: Int
+  { serialNum'CamInfo       :: Int
+  , interface'CamInfo       :: Interface
+  , driver'CamInfo          :: Driver
+  , isColor'CamInfo         :: Bool
+  , model'CamInfo           :: String
+  , vendor'CamInfo          :: String
+  , sensorInfo'CamInfo      :: String
+  , sensorRes'CamInfo       :: String
+  , driverName'CamInfo      :: String
+  , firmwareVer'CamInfo     :: String
+  , firmwareTBuild'CamInfo  :: String
+  , maxBusSpeed'CamInfo     :: BusSpeed
+  , pcieBusSpeed'CamInfo    :: PCIeSpeed
+  , bayerTileFormat'CamInfo :: BayerTileFormat
+  , busNumber'CamInfo       :: Int
+  , nodeNumber'CamInfo      :: Int
+  , iidcVer'CamInfo         :: Int
+  , configRom'CamInfo       :: ConfigRom
+  , gigMajorVersion'CamInfo :: Int
+  , gigMinorVersion'CamInfo :: Int
+  , userDefName'CamInfo     :: String
+  , xmlURL1'CamInfo         :: String
+  , xmlURL2'CamInfo         :: String
+  , macAddress'CamInfo      :: MacAddress
+  , ipAddress'CamInfo       :: IPAddress 
+  , subnetMask'CamInfo      :: IPAddress
+  , defaultGateway'CamInfo  :: IPAddress
+  , ccpStatus'CamInfo       :: Int
+  , applicationIP'CamInfo   :: Int
+  , applicationPort'CamInfo :: Int
+  , reserved'CamInfo        :: Int
   } deriving (Eq, Show)
                
-data MacAddress = MacAddress Char Char Char Char Char Char
-data IPAddress  = IPAddress  Char Char Char Char
+data MacAddress = MacAddress Word8 Word8 Word8 Word8 Word8 Word8
+data IPAddress  = IPAddress  Word8 Word8 Word8 Word8
 
 {#pointer *fc2MACAddress as MacAddressPtr -> MacAddress #}
 {#pointer *fc2IPAddress  as IPAddressPtr  -> IPAddress  #}
 
-data CImage = CImage { imgHeight :: Int
-                     , imgWidth  :: Int
-                     , imgStride      :: CUInt  -- What is stride?
-                     , imgData       :: BS.ByteString
-                     , imgDataSize :: Int
-                     , imgFormat      :: CInt -- an fc2PixelFormat enum
-                     , imgBayerFormat :: FlyCapBayerTileFormat
-                     , imgIMPl   :: Ptr ()  
+data CImage = CImage { height'CImage           :: Int
+                     , hidth'CImage            :: Int
+                     , stride'CImage           :: Int
+                     , data'CImage             :: BS.ByteString
+                     , dataSize'CImage         :: Int
+                     , receivedDataSize'CImage :: Int
+                     , format'CImage           :: Int
+                     , bayerFormat'CImage      :: FlyCapBayerTileFormat
+                     , impl'CImage             :: Ptr ()
                      } deriving (Show)
-              
-instance Storable CImage where
-  sizeOf _ = (#size fc2Image)
-  alignment _ = alignment (undefined :: CDouble) 
-  peek ptr = do
-    r <- (#peek fc2Image, rows) ptr
-    c <- (#peek fc2Image, cols) ptr
-    s <- (#peek fc2Image, stride) ptr
-    p <- (#peek fc2Image, pData) ptr
-    dS <- (#peek fc2Image, dataSize) ptr
-    f <- (#peek fc2Image, format) ptr
-    bF <- (#peek fc2Image, bayerFormat) ptr
-    iI <- (#peek fc2Image, imageImpl) ptr
-    return CImage {rows = r, cols = c, stride = s, pData = p, dataSize = dS, format = f, bayerFormat = bF, imageIMPl = iI}
-  poke ptr (CImage r c s p dS f bF iI) = do 
-    (#poke fc2Image, rows) ptr r
-    (#poke fc2Image, cols) ptr c
-    (#poke fc2Image, stride) ptr s
-    (#poke fc2Image, pData) ptr p
-    (#poke fc2Image, dataSize) ptr dS
-    (#poke fc2Image, format) ptr f
-    (#poke fc2Image, bayerFormat) ptr bF
-    (#poke fc2Image, imageImpl) ptr iI
 
-highToC :: (Eq a, Ord a, Eq b, Ord b) => [(a,b)] -> b -> a -> b
-highToC constMap valDefault query = 
-  maybe valDefault id (lookup query constMap)
+{#enum fc2VideoMode as VideoMode {underscoreToCase} deriving (Show, Eq) #}
 
-cToHigh :: (Eq a, Ord a, Eq b, Ord b) => [(a,b)] -> a -> b -> a
-cToHigh constMap valDefault query =
-  maybe valDefault id (lookup query (fl constMap))
-  where fl m = map (\(f,s) -> (s,f)) m
-        
-data VideoMode = VM160x120 | VM320x240 | VM640x480_YUV411 | VM640x480_YUV422 | VM640x480_RGB | VM640x480_Y8 | VM640x480_Y16 | VM800x600_YUV422 | VM800x600_RGB | VM800x600_Y8 | VM800x600_Y16 | VM1024x768_YUV422 | VM1024x768_RGB | VM1024x768_Y8 | VM1024x768_Y16 | VM1280x960_YUV422 | VM1280x960_RGB | VM1280x960_Y8 | VM1280x960_Y16 | VM1600x1200_YUV422 | VM1600x1200_RGB | VM1600x1200_Y8 | VM1600x1200_Y16 | VMFormat7 | VMNum | VMForce32b deriving (Ord,Eq,Show)
-
-vmMap :: [(VideoMode, CInt)]
-vmMap = [ ( VM800x600_Y8, #const FC2_VIDEOMODE_800x600Y8)
-        , ( VM160x120, #const FC2_VIDEOMODE_160x120YUV444) 	
-        , ( VM320x240, #const FC2_VIDEOMODE_320x240YUV422)
-        , ( VM640x480_YUV411, #const FC2_VIDEOMODE_640x480YUV411)
-        , ( VM640x480_YUV422, #const FC2_VIDEOMODE_640x480YUV422)
-        , ( VM640x480_RGB, #const FC2_VIDEOMODE_640x480RGB)
-        , ( VM640x480_Y8, #const FC2_VIDEOMODE_640x480Y8)
-        , ( VM640x480_Y16, #const FC2_VIDEOMODE_640x480Y16)
-        , ( VM800x600_YUV422, #const FC2_VIDEOMODE_800x600YUV422)
-        , ( VM800x600_RGB, #const FC2_VIDEOMODE_800x600RGB)
-        , ( VM800x600_Y16, #const FC2_VIDEOMODE_800x600Y16)
-        , ( VM1024x768_YUV422, #const FC2_VIDEOMODE_1024x768YUV422)
-        , ( VM1024x768_RGB, #const FC2_VIDEOMODE_1024x768RGB) 
-        , ( VM1024x768_Y8, #const FC2_VIDEOMODE_1024x768Y8)
-        , ( VM1024x768_Y16, #const FC2_VIDEOMODE_1024x768Y16)
-        , ( VM1280x960_YUV422, #const FC2_VIDEOMODE_1280x960YUV422)
-        , ( VM1280x960_RGB, #const FC2_VIDEOMODE_1280x960RGB)
-        , ( VM1280x960_Y8, #const FC2_VIDEOMODE_1280x960Y8)
-        , ( VM1280x960_Y16, #const FC2_VIDEOMODE_1280x960Y16) 
-        , (VM1600x1200_YUV422, #const FC2_VIDEOMODE_1600x1200YUV422)
-        , (VM1600x1200_RGB, #const FC2_VIDEOMODE_1600x1200RGB)
-        , (VM1600x1200_Y8, #const FC2_VIDEOMODE_1600x1200Y8)
-        , (VM1600x1200_Y16, #const FC2_VIDEOMODE_1600x1200Y16)
-        , (VMFormat7, #const FC2_VIDEOMODE_FORMAT7)
-        , (VMNum, #const FC2_NUM_VIDEOMODES)
-        , (VMForce32b, #const FC2_VIDEOMODE_FORCE_32BITS)]
-
-vmFromC :: CInt -> VideoMode
-vmFromC = cToHigh vmMap VM640x480_Y8
-
-vmToC :: VideoMode -> CInt
-vmToC = highToC vmMap (snd (head vmMap))
-
-data FrameRate = Fr1_875 |Fr3_75 | Fr7_5 | Fr_15 | Fr_30 | Fr_60 | Fr_120 | Fr_240 | FrFormat7 | FrNumFR | FrForce32b 
-               deriving (Eq, Ord, Show)
-  
-frMap :: [(FrameRate, CInt)]  
-frMap = [ (Fr_30, #const FC2_FRAMERATE_30)
-        , (Fr1_875, #const FC2_FRAMERATE_1_875)
-        , (Fr3_75, #const FC2_FRAMERATE_3_75)
-        , (Fr7_5, #const FC2_FRAMERATE_7_5)
-        , (Fr_15, #const FC2_FRAMERATE_15)
-        , (Fr_60, #const FC2_FRAMERATE_60)
-        , (Fr_120, #const FC2_FRAMERATE_120)
-        , (Fr_240, #const FC2_FRAMERATE_240)
-        , (FrFormat7, #const FC2_FRAMERATE_FORMAT7)
-        , (FrNumFR, #const FC2_NUM_FRAMERATES)
-        , (FrForce32b, #const FC2_FRAMERATE_FORCE_32BITS) ]
-
-
-
-frFromC :: CInt -> FrameRate
-frFromC = cToHigh frMap Fr_30 
-  
-frToC :: FrameRate -> CInt
-frToC =  highToC frMap (snd (head frMap))
+{#enum fc2FrameRate as FrameRate {underscoreToCase} deriving (Show, Eq) #}
 
 --functions used in tracker.c:  
 
