@@ -1,40 +1,4 @@
-module System.FlyCap ( VideoMode (..) 
-                     , FrameRate (..)
-                     , Context
-                     , FCImage (..) 
-                     , CImage (..) 
-                     , hRetBuff  
-                     , hGetNum 
-                     , hCreateC 
-                     , hGetCamIndex 
-                     , hGetCamSerial 
-                     , hConnect
-                     , hLibVersion
-                     , hGetCamInfo
-                     , hSetVMandFR
-                     , hStartSCapture
-                     , hRetrieveBuffer
---                     , hStartCapture
---                     , hStopCapture
-                     , hGetImageData
-                     , hDisconnect
-                     , getDynamicImage
-                     , getImage
-                     , hDestroyContext
-                     , fc2CreateImage
-                     , fc2RetrieveBuffer
-                     , destroyImage  
---                     , createContexts  
---                     , createMore
-
-
-
-
-
-
-
-
-                     ) where
+module System.FlyCap where
 
 import qualified System.FlyCap.Internal as FlyCapBase
 import Foreign
@@ -58,13 +22,15 @@ import qualified Codec.Picture.Types as JPTypes
 -- to handle color / 2-byte pixels too.  Maybe depend on juicypixels
 -- and use their DynamicImage type instead of this
 
-type Context = FlyCapBase.Context
+-- type Context = FlyCapBase.Context
 
 -- TODO: import CV, make type synonyms to clarify that Capture refers
 -- to AVI files and Context refers to individual cameras
 --data CaptureHandle = AVISetHandle [Capture]
 --                   | CameraSetHandle [Context]
 
+
+{-
 data FCImage = FCImage
                Int -- ^ column count (width)
                Int -- ^ row count    (height)
@@ -321,5 +287,7 @@ fromAVI = do
     return ()
   waitKey 0
   destroyWindow "testing"
+
+-}
 
 -}

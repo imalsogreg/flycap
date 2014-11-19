@@ -29,6 +29,7 @@ Library
     , bytestring
     , carray
     , JuicyPixels (>=3.1 && < 4.0)
+    , mtl
     , transformers
     , vector 
 
