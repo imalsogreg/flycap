@@ -1,5 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module System.FlyCap.Internal where
 
@@ -147,7 +148,12 @@ data ConfigRom =
 
 {#pointer *fc2ConfigROM as ConfigRomPtr -> ConfigRom #}
 
-{-    
+------------------------------------------------------------------------------
+-- Util
+pokeCString :: Ptr CChar -> String -> IO ()
+pokeCString p str = pokeArray0 (castCharToCChar '\0') p 
+                     (map castCharToCChar str)
+
 instance Storable ConfigRom where
   sizeOf _ = {#sizeof fc2ConfigROM #}
   alignment _ = 4
@@ -162,22 +168,32 @@ instance Storable ConfigRom where
     <*> liftM fromIntegral ({#get fc2ConfigROM->vendorUniqueInfo_1 #} p)
     <*> liftM fromIntegral ({#get fc2ConfigROM->vendorUniqueInfo_2 #} p)
     <*> liftM fromIntegral ({#get fc2ConfigROM->vendorUniqueInfo_3 #} p)
-    <*> (peekCString =<< ({#get fc2ConfigROM->pszKeyword #} p)) 
-    <*> map fromIntegral `liftM` (({#get fc2ConfigROM->reserved #} p) >>= (peekArray 16)) 
+    <*> peekCString (p `plusPtr` {#offsetof fc2ConfigROM->pszKeyword #})
+    <*> map fromIntegral `liftM` peekArray 16 
+        (p `plusPtr` {#offsetof fc2ConfigROM->reserved #} :: Ptr CUInt)
   poke p c = do
-    {#set fc2ConfigROM->nodeVendorId       #} p (fromIntegral $ vendor'ConfigRom  c)
-    {#set fc2ConfigROM->chipIdHi           #} p (fromIntegral $ chipIdH'ConfigRom c)
-    {#set fc2ConfigROM->chipIdLo           #} p (fromIntegral $ chipIdL'ConfigRom c)
-    {#set fc2ConfigROM->unitSpecId         #} p (fromIntegral $ unitSpec'ConfigRom c)
-    {#set fc2ConfigROM->unitSubSWVer       #} p (fromIntegral $ unitSWVer'ConfigRom c)
-    {#set fc2ConfigROM->vendorUniqueInfo_0 #} p (fromIntegral $ vendorUnique0'ConfigRom c)
-    {#set fc2ConfigROM->vendorUniqueInfo_1 #} p (fromIntegral $ vendorUnique1'ConfigRom c)
-    {#set fc2ConfigROM->vendorUniqueInfo_2 #} p (fromIntegral $ vendorUnique2'ConfigRom c)
-    {#set fc2ConfigROM->vendorUniqueInfo_3 #} p (fromIntegral $ vendorUnique3'ConfigRom c)
-    (withCString (pszKeyword'ConfigRom c) ({#set fc2ConfigROM->pszKeyword         #} p )) 
-    {#set fc2ConfigROM->reserved           #} p (fromIntegral $ reserved'ConfigRom c)
--}
-
+    {#set fc2ConfigROM->nodeVendorId       #} p 
+      (fromIntegral $ vendor'ConfigRom  c)
+    {#set fc2ConfigROM->chipIdHi           #} p 
+      (fromIntegral $ chipIdH'ConfigRom c)
+    {#set fc2ConfigROM->chipIdLo           #} p 
+      (fromIntegral $ chipIdL'ConfigRom c)
+    {#set fc2ConfigROM->unitSpecId         #} p 
+      (fromIntegral $ unitSpec'ConfigRom c)
+    {#set fc2ConfigROM->unitSubSWVer       #} p 
+      (fromIntegral $ unitSWVer'ConfigRom c)
+    {#set fc2ConfigROM->vendorUniqueInfo_0 #} p 
+      (fromIntegral $ vendorUnique0'ConfigRom c)
+    {#set fc2ConfigROM->vendorUniqueInfo_1 #} p 
+      (fromIntegral $ vendorUnique1'ConfigRom c)
+    {#set fc2ConfigROM->vendorUniqueInfo_2 #} p 
+      (fromIntegral $ vendorUnique2'ConfigRom c)
+    {#set fc2ConfigROM->vendorUniqueInfo_3 #} p 
+      (fromIntegral $ vendorUnique3'ConfigRom c)
+    pokeCString (p `plusPtr` {#offsetof fc2ConfigROM->pszKeyword #}) 
+      (pszKeyword'ConfigRom c) 
+    pokeArray (p `plusPtr` {#offsetof fc2ConfigROM->reserved #}) 
+      (map fromIntegral $ reserved'ConfigRom c :: [CUInt])
 
 
 {#enum fc2InterfaceType as Interface {underscoreToCase} 
@@ -228,9 +244,55 @@ data CamInfo = CamInfo
   , ccpStatus'CamInfo       :: Int
   , applicationIP'CamInfo   :: Int
   , applicationPort'CamInfo :: Int
-  , reserved'CamInfo        :: Int
+  , reserved'CamInfo        :: [Int]
   } deriving (Eq, Show)
-               
+
+{#fun fc2GetCameraInfo as ^
+ { unContext `Context', alloca- `CamInfo' peek* } -> `Error' #}
+
+getCamInfo :: FlyCap CamInfo
+getCamInfo = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetCameraInfo ctx
+
+instance Storable CamInfo where
+  sizeOf _ = {#sizeof fc2CameraInfo #}
+  alignment _ = 4
+  peek p = CamInfo 
+    <$> liftM fromIntegral ({#get fc2CameraInfo->serialNumber #} p)
+    <*> liftM (toEnum . fromIntegral) ({#get fc2CameraInfo->interfaceType #} p)
+    <*> liftM (toEnum . fromIntegral) ({#get fc2CameraInfo->driverType #} p)
+    <*> liftM (toEnum . fromIntegral) ({#get fc2CameraInfo->isColorCamera #} p)
+    <*> peekCString  (p `plusPtr` {#offsetof fc2CameraInfo->modelName #})
+    <*> peekCString  (p `plusPtr` {#offsetof fc2CameraInfo->vendorName #})
+    <*> peekCString  (p `plusPtr` {#offsetof fc2CameraInfo->sensorInfo #})
+    <*> peekCString  (p `plusPtr` {#offsetof fc2CameraInfo->sensorResolution #})
+    <*> peekCString  (p `plusPtr` {#offsetof fc2CameraInfo->driverName #})
+    <*> peekCString  (p `plusPtr` {#offsetof fc2CameraInfo->firmwareVersion #})
+    <*> peekCString  (p `plusPtr` {#offsetof fc2CameraInfo->firmwareBuildTime #})
+    <*> liftM (toEnum . fromIntegral) ({#get fc2CameraInfo->maximumBusSpeed #} p)
+    <*> liftM (toEnum . fromIntegral) ({#get fc2CameraInfo->pcieBusSpeed #} p)
+    <*> liftM (toEnum . fromIntegral) ({#get fc2CameraInfo-> bayerTileFormat #} p)
+    <*> liftM fromIntegral ({#get fc2CameraInfo->busNumber #} p)
+    <*> liftM fromIntegral ({#get fc2CameraInfo->nodeNumber #} p)
+    <*> liftM fromIntegral ({#get fc2CameraInfo->iidcVer #} p)
+    <*> peek (p `plusPtr` {#offsetof fc2CameraInfo->configROM #})
+    <*> liftM fromIntegral ({#get fc2CameraInfo->gigEMajorVersion #} p)
+    <*> liftM fromIntegral ({#get fc2CameraInfo->gigEMinorVersion #} p)
+    <*> peekCString (p `plusPtr` {#offsetof fc2CameraInfo->userDefinedName #})
+    <*> peekCString (p `plusPtr` {#offsetof fc2CameraInfo->xmlURL1 #})
+    <*> peekCString (p `plusPtr` {#offsetof fc2CameraInfo->xmlURL2 #})
+    <*> peek (p `plusPtr` {#offsetof fc2CameraInfo->macAddress #})
+    <*> peek (p `plusPtr` {#offsetof fc2CameraInfo->ipAddress #})
+    <*> peek (p `plusPtr` {#offsetof fc2CameraInfo->subnetMask #})
+    <*> peek (p `plusPtr` {#offsetof fc2CameraInfo->defaultGateway #})
+    <*> liftM fromIntegral ({#get fc2CameraInfo->ccpStatus #} p)
+    <*> liftM fromIntegral ({#get fc2CameraInfo->applicationIPAddress #} p)
+    <*> liftM fromIntegral ({#get fc2CameraInfo->applicationPort #} p)
+    <*> (map fromIntegral) `liftM` (peekArray 16 (p `plusPtr` {#offsetof fc2CameraInfo->reserved #}) :: IO [CUInt])
+
+{#fun fc2Connect as ^
+  { unContext `Context', poke `Guid' } -> `Error' #}
 
 data CImage = CImage { height'CImage           :: Int
                      , hidth'CImage            :: Int
