@@ -289,10 +289,12 @@ instance Storable CamInfo where
     <*> liftM fromIntegral ({#get fc2CameraInfo->ccpStatus #} p)
     <*> liftM fromIntegral ({#get fc2CameraInfo->applicationIPAddress #} p)
     <*> liftM fromIntegral ({#get fc2CameraInfo->applicationPort #} p)
-    <*> (map fromIntegral) `liftM` (peekArray 16 (p `plusPtr` {#offsetof fc2CameraInfo->reserved #}) :: IO [CUInt])
+    <*> (map fromIntegral) `liftM`
+          (peekArray 16 (p `plusPtr`
+                         {#offsetof fc2CameraInfo->reserved #}) :: IO [CUInt])
 
 {#fun fc2Connect as ^
-  { unContext `Context', poke `Guid' } -> `Error' #}
+  { unContext `Context', alloca- `Guid' peek* } -> `Error' #}
 
 data CImage = CImage { height'CImage           :: Int
                      , hidth'CImage            :: Int
