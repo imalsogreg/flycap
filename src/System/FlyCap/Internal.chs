@@ -30,23 +30,36 @@ runFlyCap a = do
   ctx <- fc1 <$> fc2CreateContext
   (runReaderT $ unFlyCap a) ctx
 
+
 {#pointer *fc2Context as ContextPtr -> Context #}
 
 newtype Context = Context { unContext :: Ptr () }  
-  deriving (Eq, Show, Storable)
+                deriving (Eq, Show, Storable)
+
+
+{#pointer *fc2PGRGuid as GuidPtr -> Guid #}
+
+newtype Guid = Guid {unGuid :: [Int]} deriving (Eq, Show) 
+
+
 
 {#enum fc2Error as Error {underscoreToCase} deriving (Show,Eq) #}
 
 {#fun fc2CreateContext as ^
  { alloca- `Context' peek* } -> `Error' #}
 
+
+{#fun fc2GetNumOfCameras as ^
+ { unContext `Context' , alloca- `CUInt' peek* } -> `Error' #}
+
 getNumOfCameras :: FlyCap Int
 getNumOfCameras = do
   ctx <- ask
   liftIO $ (fromIntegral . fc1) <$> fc2GetNumOfCameras ctx
 
-{#fun fc2GetNumOfCameras as ^
- { unContext `Context' , alloca- `CUInt' peek* } -> `Error' #}
+
+{#fun fc2GetCameraFromIndex as ^
+ { unContext `Context', `Int', alloca- `Guid' peek* } -> `Error' #}
 
 getCameraFromIndex :: Int -> FlyCap Guid
 getCameraFromIndex i = do
@@ -54,14 +67,28 @@ getCameraFromIndex i = do
   liftIO $ fc1 <$> fc2GetCameraFromIndex ctx i
 
 
+{#fun fc2GetCameraFromSerialNumber as ^
+  { unContext `Context', `Int', alloca- `Guid' peek* } -> `Error' #}
+
+getCameraFromSerialNumber :: Int -> FlyCap Guid
+getCameraFromSerialNumber sn = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetCameraFromSerialNumber ctx sn
+
+
+{#fun fc2Connect as ^
+  { unContext `Context', peek* `Guid' void- } -> `Error' #}
+
+connect :: Guid -> FlyCap ()
+connect g = do
+  ctx <- ask
+  _ <- liftIO $ fc2Connect ctx g
+  return ()
+
+
 type ImageData = Ptr CUChar
 
-newtype Guid = Guid {unGuid :: [Int]} deriving (Eq, Show) 
 
-{#pointer *fc2PGRGuid as GuidPtr -> Guid #}                                                           
-
-{#fun fc2GetCameraFromIndex as ^
- { unContext `Context', `Int', alloca- `Guid' peek* } -> `Error' #}
 
 ------------------------------------------------------------------------------
 instance Storable Guid where
@@ -293,8 +320,6 @@ instance Storable CamInfo where
           (peekArray 16 (p `plusPtr`
                          {#offsetof fc2CameraInfo->reserved #}) :: IO [CUInt])
 
-{#fun fc2Connect as ^
-  { unContext `Context', alloca- `Guid' peek* } -> `Error' #}
 
 data CImage = CImage { height'CImage           :: Int
                      , hidth'CImage            :: Int
@@ -314,11 +339,6 @@ data CImage = CImage { height'CImage           :: Int
 --functions used in tracker.c:  
 
 {-
-foreign import ccall unsafe "FlyCapture2_C.h fc2GetNumOfCameras"
-   fc2getNumOfCameras :: Context -> Ptr CUInt -> IO Error
-                         
-foreign import ccall unsafe "FlyCapture2_C.h fc2CreateContext"
-   fc2CreateContext :: Ptr (Context) -> IO Error
                       
 foreign import ccall unsafe "FlyCapture2_C.h fc2GetCameraFromIndex"
    fc2GetCameraFromIndex :: Context -> CUInt -> Ptr Guid -> IO Error
@@ -395,6 +415,10 @@ ctoJImage (CImage r c _ p _ _ _ _ ) = do
   return bs
  
 -}
+
+fc0 :: Error -> ()
+fc0 Fc2ErrorOk = ()
+fc0 e          = error $ "FlyCapture2 error: " ++ show e
 
 fc1 :: (Error,a) -> a
 fc1 (Fc2ErrorOk,a) = a
