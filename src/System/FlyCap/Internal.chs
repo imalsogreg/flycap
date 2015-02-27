@@ -2,13 +2,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module System.FlyCap.Internal where
-
--- TODO: uses of peekArray return lists of bytes
---       This is used when grabbing frames
---       Is there something in ByteString that allows
---       direct bytestring building from a c array?
 
 import Control.Applicative
 import Control.Monad
@@ -23,6 +19,7 @@ import Codec.Picture
 import GHC.Word
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
 
 
 #include <FlyCapture2_C.h>
@@ -38,18 +35,28 @@ runFlyCap a = do
   fc0 <$> fc2DestroyContext ctx
   return a
 
-testAction :: IO FCImage
+testAction :: IO ()
 testAction = runFlyCap $ do
   getNumOfCameras >>= (\n -> liftIO (print n))
   g <- getCameraFromIndex 0
   connect g
   getCameraInfo >>= (\i -> liftIO (print i))
   startCapture
+  liftIO $ print "Started Capture"
   b <- getFrame
+  liftIO $ print "Got frame"
   stopCapture
-  return b
+
+  dataPtr <- liftIO $ newForeignPtr_ (castPtr $ data'FCImage b)
+  let jImg' = encodeBitmap (imageFromUnsafePtr 640 480 dataPtr :: Image Pixel8) :: BSL.ByteString
+  case decodeImage (BSL.toStrict jImg') of
+    Left s     -> liftIO . print $ "Decode error: " ++ s
+    Right jImg -> liftIO $ saveBmpImage "test.bmp" jImg
+
 
 {#pointer *fc2Context as ContextPtr -> Context #}
+
+
 
 newtype Context = Context { unContext :: Ptr () }  
                 deriving (Eq, Show, Storable)
@@ -199,6 +206,9 @@ data ConfigRom =
 pokeCString :: Ptr CChar -> String -> IO ()
 pokeCString p str = pokeArray0 (castCharToCChar '\0') p 
                      (map castCharToCChar str)
+
+--pokeCStrningLen :: Ptr CChar -> CStringLen -> IO ()
+--pokeCStringLen p (str,l) = pokeArrayBytes l str
 
 instance Storable ConfigRom where
   sizeOf _ = {#sizeof fc2ConfigROM #}
@@ -357,15 +367,16 @@ stopCapture = do
   liftIO $ fc0 <$> fc2StopCapture ctx
   
 
-data FCImage = FCImage { height'FCImage           :: Int
-                       , width'FCImage            :: Int
-                       , stride'FCImage           :: Int
-                       , data'FCImage             :: BS.ByteString
-                       , dataSize'FCImage         :: Int
-                       , receivedDataSize'FCImage :: Int
-                       , format'FCImage           :: Int
-                       , bayerFormat'FCImage      :: BayerTileFormat
-                       , impl'FCImage             :: Ptr ()
+data FCImage = FCImage { height'FCImage           :: !Int
+                       , width'FCImage            :: !Int
+                       , stride'FCImage           :: !Int
+--                       , data'FCImage             :: !BS.ByteString
+                       , data'FCImage             :: !(Ptr CUChar)
+                       , dataSize'FCImage         :: !Int
+                       , receivedDataSize'FCImage :: !Int
+                       , format'FCImage           :: !Int
+                       , bayerFormat'FCImage      :: !BayerTileFormat
+                       , impl'FCImage             :: !(Ptr ())
                        } deriving (Show)
 
 
@@ -373,10 +384,31 @@ getFrame :: FlyCap FCImage
 getFrame = do
   ctx <- ask
   img <- liftIO createImage
-  retrieveBuffer img
+  liftIO $ print "IMG"
+--  liftIO $ print img
+  img' <- retrieveBuffer img
+  liftIO $ print "IMG'"
+--  liftIO $ print img'
+  return img'
 
 {#fun fc2RetrieveBuffer as ^
    { unContext `Context', withT* `FCImage' peek* } -> `Error' #}
+
+{-
+fc2RetrieveBuffer :: (Context) -> (FCImage) -> IO ((Error), (FCImage))
+fc2RetrieveBuffer a1 a2 =
+  let {a1' = unContext a1} in 
+  withT a2 $ \a2' -> do
+    print "ABOUT TO fc2RetrieveBuffer"
+    res <- fc2RetrieveBuffer'_ a1' a2'
+    print "DID fc2RetrieveBuffer"
+    let {res' = (toEnum . fromIntegral) res}
+    print "ABOUT TO PEEK"
+    a2'' <- peek  a2'
+    print "PEEKED"
+    return (res', a2'')
+-}
+
 
 {#fun fc2CreateImage as ^
   { alloca- `FCImage' peek* } -> `Error' #}
@@ -397,20 +429,34 @@ instance Storable FCImage where
     nRows   <- liftM fromIntegral ({#get fc2Image->rows #} p)
     nCols   <- liftM fromIntegral ({#get fc2Image->cols #} p)
     stride  <- liftM fromIntegral ({#get fc2Image->stride #} p)
-    let nImageBytes = nRows * nCols * stride
+    let nImageBytes = nRows * stride -- stride means: bytes per row
         pDataPtr    = p `plusPtr` {#offsetof fc2Image->pData #}
-        imgCStr     = (pDataPtr, nImageBytes)
+--        imgCStr     = (pDataPtr, nImageBytes)
+    putStrLn $ unwords ["About to pack", show nImageBytes, "cstring bytes. "
+                       ,"rows:", show nRows, "  cols:", show nCols, " stride:", show stride]
     FCImage
       <$> pure nRows
       <*> pure nCols
       <*> pure stride
-      <*> BS.packCStringLen imgCStr
+--      <*> BS.packCStringLen imgCStr
+      <*> ({#get fc2Image->pData #} p)
       <*> liftM fromIntegral ({#get fc2Image->dataSize #} p)
       <*> liftM fromIntegral ({#get fc2Image->receivedDataSize #} p)
       <*> liftM (toEnum . fromIntegral) ({#get fc2Image->format #} p)
       <*> liftM (toEnum . fromIntegral) ({#get fc2Image->bayerFormat #} p)
       <*> ({#get fc2Image->imageImpl #} p)
 
+--  poke p FCImage{..} = BS.useAsCString data'FCImage $ \pData -> do
+  poke p FCImage{..} = do
+    poke' (p `plusPtr` {#offsetof fc2Image->rows #}) height'FCImage
+    poke' (p `plusPtr` {#offsetof fc2Image->cols #}) width'FCImage
+    poke' (p `plusPtr` {#offsetof fc2Image->stride #}) stride'FCImage
+    poke' (p `plusPtr` {#offsetof fc2Image->pData #}) data'FCImage
+    poke' (p `plusPtr` {#offsetof fc2Image->receivedDataSize #}) receivedDataSize'FCImage
+    poke' (p `plusPtr` {#offsetof fc2Image->format #}) format'FCImage
+    poke' (p `plusPtr` {#offsetof fc2Image->bayerFormat #}) (fromEnum bayerFormat'FCImage)
+    poke' (p `plusPtr` {#offsetof fc2Image->imageImpl #}) impl'FCImage
+    
 
 {#enum fc2PixelFormat as PixelFormat {underscoreToCase} deriving (Show, Eq) #}
 
@@ -423,6 +469,26 @@ instance Storable FCImage where
 withT :: Storable a => a -> (Ptr a -> IO b) -> IO b
 withT = with
 
+writeCStringFromByteString :: BS.ByteString -> IO (Ptr CChar)
+writeCStringFromByteString bs = do
+  -- free ptr -- TODO: Is this right?
+  p <- mallocBytes (BS.length bs) -- Is this right?
+  BS.useAsCStringLen bs $ \(strPtr, strLen) -> do
+    copyBytes p strPtr strLen
+  return p
+
+-- Verbose poke utility function
+poke' :: (Show a, Storable a) => Ptr a -> a -> IO ()
+poke' ptr a = do
+  putStrLn $ "Poking " ++ show ptr ++ " with " ++ show a
+  poke ptr a
+
+writeCStringFromByteString' :: BS.ByteString -> Ptr CChar -> IO ()
+writeCStringFromByteString' bs ptr = do
+  -- free ptr -- TODO: Is this right?
+  p <- reallocBytes ptr (BS.length bs) -- Is this right?
+  BS.useAsCStringLen bs $ \(strPtr, strLen) -> do
+    copyBytes p strPtr strLen 
 
 --functions used in tracker.c:  
 
