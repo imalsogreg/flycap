@@ -1,8 +1,14 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 module System.FlyCap.Internal where
+
+-- TODO: uses of peekArray return lists of bytes
+--       This is used when grabbing frames
+--       Is there something in ByteString that allows
+--       direct bytestring building from a c array?
 
 import Control.Applicative
 import Control.Monad
@@ -41,8 +47,6 @@ newtype Context = Context { unContext :: Ptr () }
 
 newtype Guid = Guid {unGuid :: [Int]} deriving (Eq, Show) 
 
-
-
 {#enum fc2Error as Error {underscoreToCase} deriving (Show,Eq) #}
 
 {#fun fc2CreateContext as ^
@@ -77,7 +81,7 @@ getCameraFromSerialNumber sn = do
 
 
 {#fun fc2Connect as ^
-  { unContext `Context', peek* `Guid' void- } -> `Error' #}
+  { unContext `Context', withT* `Guid' void- } -> `Error' #}
 
 connect :: Guid -> FlyCap ()
 connect g = do
@@ -86,7 +90,8 @@ connect g = do
   return ()
 
 
-type ImageData = Ptr CUChar
+{#pointer *fc2Image as FCImagePtr -> FCImage #}
+
 
 
 
@@ -321,33 +326,73 @@ instance Storable CamInfo where
                          {#offsetof fc2CameraInfo->reserved #}) :: IO [CUInt])
 
 
-data CImage = CImage { height'CImage           :: Int
-                     , hidth'CImage            :: Int
-                     , stride'CImage           :: Int
-                     , data'CImage             :: BS.ByteString
-                     , dataSize'CImage         :: Int
-                     , receivedDataSize'CImage :: Int
-                     , format'CImage           :: Int
-                     , bayerFormat'CImage      :: BayerTileFormat
-                     , impl'CImage             :: Ptr ()
-                     } deriving (Show)
+data FCImage = FCImage { height'FCImage           :: Int
+                       , width'FCImage            :: Int
+                       , stride'FCImage           :: Int
+                       , data'FCImage             :: BS.ByteString
+                       , dataSize'FCImage         :: Int
+                       , receivedDataSize'FCImage :: Int
+                       , format'FCImage           :: Int
+                       , bayerFormat'FCImage      :: BayerTileFormat
+                       , impl'FCImage             :: Ptr ()
+                       } deriving (Show)
+
+
+{#fun fc2RetrieveBuffer as ^
+   { unContext `Context', alloca- `FCImage' peek* } -> `Error' #}
+
+retrieveBuffer :: FlyCap FCImage
+retrieveBuffer = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2RetrieveBuffer ctx
+
+------------------------------------------------------------------------------
+instance Storable FCImage where
+  sizeOf _    = {#sizeof fc2Image#}
+  alignment _ = 4
+  peek p = do
+    nRows   <- liftM fromIntegral ({#get fc2Image->rows #} p)
+    nCols   <- liftM fromIntegral ({#get fc2Image->cols #} p)
+    stride  <- liftM fromIntegral ({#get fc2Image->stride #} p)
+    let nImageBytes = nRows * nCols * stride
+        pDataPtr    = p `plusPtr` {#offsetof fc2Image->pData #}
+        imgCStr     = (pDataPtr, nImageBytes)
+    FCImage
+      <$> pure nRows
+      <*> pure nCols
+      <*> pure stride
+      <*> BS.packCStringLen imgCStr
+      <*> liftM fromIntegral ({#get fc2Image->dataSize #} p)
+      <*> liftM fromIntegral ({#get fc2Image->receivedDataSize #} p)
+      <*> liftM (toEnum . fromIntegral) ({#get fc2Image->format #} p)
+      <*> liftM (toEnum . fromIntegral) ({#get fc2Image->bayerFormat #} p)
+      <*> ({#get fc2Image->imageImpl #} p)
+
+
+{#enum fc2PixelFormat as PixelFormat {underscoreToCase} deriving (Show, Eq) #}
 
 {#enum fc2VideoMode as VideoMode {underscoreToCase} deriving (Show, Eq) #}
 
 {#enum fc2FrameRate as FrameRate {underscoreToCase} deriving (Show, Eq) #}
 
+
+-- Rename Foreign.with to withT because c2hs uses 'with' as a keyword
+withT :: Storable a => a -> (Ptr a -> IO b) -> IO b
+withT = with
+
+
 --functions used in tracker.c:  
 
 {-
                       
-foreign import ccall unsafe "FlyCapture2_C.h fc2GetCameraFromIndex"
-   fc2GetCameraFromIndex :: Context -> CUInt -> Ptr Guid -> IO Error
 
-foreign import ccall unsafe "FlyCapture2_C.h fc2GetCameraFromSerialNumber"
-   fc2GetCameraFromSerialNumber :: Context -> CUInt -> Ptr Guid -> IO Error
 
-foreign import ccall unsafe "FlyCapture2_C.h fc2Connect"
-  fc2Connect :: Context -> Ptr Guid -> IO Error
+
+
+
+
+
+
 
 foreign import ccall unsafe "FlyCapture2_C.h fc2GetLibraryVersion"
   fc2GetLibraryVersion :: Ptr fc2Version -> IO Error
