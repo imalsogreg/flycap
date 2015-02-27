@@ -8,3 +8,5 @@ cabal-dev
 *~
 .cabal-sandbox
 cabal.sandbox.config
+TAGS
+src/System/FlyCap/Internal.i

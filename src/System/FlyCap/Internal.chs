@@ -34,8 +34,20 @@ newtype FlyCap a = FlyCap { unFlyCap :: ReaderT Context IO a }
 runFlyCap :: FlyCap a -> IO a
 runFlyCap a = do
   ctx <- fc1 <$> fc2CreateContext
-  (runReaderT $ unFlyCap a) ctx
+  a <- (runReaderT $ unFlyCap a) ctx
+  fc0 <$> fc2DestroyContext ctx
+  return a
 
+testAction :: IO FCImage
+testAction = runFlyCap $ do
+  getNumOfCameras >>= (\n -> liftIO (print n))
+  g <- getCameraFromIndex 0
+  connect g
+  getCameraInfo >>= (\i -> liftIO (print i))
+  startCapture
+  b <- getFrame
+  stopCapture
+  return b
 
 {#pointer *fc2Context as ContextPtr -> Context #}
 
@@ -52,6 +64,8 @@ newtype Guid = Guid {unGuid :: [Int]} deriving (Eq, Show)
 {#fun fc2CreateContext as ^
  { alloca- `Context' peek* } -> `Error' #}
 
+{#fun fc2DestroyContext as ^
+  { unContext `Context' } -> `Error' #}
 
 {#fun fc2GetNumOfCameras as ^
  { unContext `Context' , alloca- `CUInt' peek* } -> `Error' #}
@@ -282,8 +296,8 @@ data CamInfo = CamInfo
 {#fun fc2GetCameraInfo as ^
  { unContext `Context', alloca- `CamInfo' peek* } -> `Error' #}
 
-getCamInfo :: FlyCap CamInfo
-getCamInfo = do
+getCameraInfo :: FlyCap CamInfo
+getCameraInfo = do
   ctx <- ask
   liftIO $ fc1 <$> fc2GetCameraInfo ctx
 
@@ -326,6 +340,23 @@ instance Storable CamInfo where
                          {#offsetof fc2CameraInfo->reserved #}) :: IO [CUInt])
 
 
+{#fun fc2StartCapture as ^
+  { unContext `Context' } -> `Error' #}
+
+startCapture :: FlyCap ()
+startCapture = do
+  ctx <- ask
+  liftIO $ fc0 <$> fc2StartCapture ctx
+
+{#fun fc2StopCapture as ^
+  { unContext `Context' } -> `Error' #}
+
+stopCapture :: FlyCap ()
+stopCapture = do
+  ctx <- ask
+  liftIO $ fc0 <$> fc2StopCapture ctx
+  
+
 data FCImage = FCImage { height'FCImage           :: Int
                        , width'FCImage            :: Int
                        , stride'FCImage           :: Int
@@ -338,13 +369,25 @@ data FCImage = FCImage { height'FCImage           :: Int
                        } deriving (Show)
 
 
-{#fun fc2RetrieveBuffer as ^
-   { unContext `Context', alloca- `FCImage' peek* } -> `Error' #}
-
-retrieveBuffer :: FlyCap FCImage
-retrieveBuffer = do
+getFrame :: FlyCap FCImage
+getFrame = do
   ctx <- ask
-  liftIO $ fc1 <$> fc2RetrieveBuffer ctx
+  img <- liftIO createImage
+  retrieveBuffer img
+
+{#fun fc2RetrieveBuffer as ^
+   { unContext `Context', withT* `FCImage' peek* } -> `Error' #}
+
+{#fun fc2CreateImage as ^
+  { alloca- `FCImage' peek* } -> `Error' #}
+
+createImage :: IO FCImage
+createImage = fc1 <$> fc2CreateImage
+
+retrieveBuffer :: FCImage -> FlyCap FCImage
+retrieveBuffer blankImg = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2RetrieveBuffer ctx blankImg
 
 ------------------------------------------------------------------------------
 instance Storable FCImage where
