@@ -1,9 +1,18 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module System.FlyCap where
 
-import qualified System.FlyCap.Internal as FlyCapBase
+import Control.Applicative
+import Control.Monad
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Reader
+import Control.Monad.Reader.Class
+import qualified Data.ByteString.Lazy as BSL
+import System.FlyCap.Internal
+import qualified System.FlyCap.Internal as FCI
 import Foreign
 import Foreign.C.Types
-
+import System.IO.Unsafe (unsafePerformIO)
 
 import Foreign.C.Error
 
@@ -13,9 +22,109 @@ import Foreign.C.Error
 --import CV.Conversions
 
 import System.FlyCap.Internal hiding (Context)
-import qualified Data.Vector.Storable as VS
+--import qualified Data.Vector.Storable as VS
 import qualified Codec.Picture as JP
-import qualified Codec.Picture.Types as JPTypes
+import qualified Codec.Picture.Types as JP
+
+newtype FlyCap a = FlyCap { unFlyCap :: ReaderT Context IO a }
+  deriving (MonadIO, MonadReader Context, Monad, Applicative, Functor)
+
+
+getFrame :: FlyCap FCImage
+getFrame = do
+  ctx <- ask
+  img <- liftIO createImage
+  img' <- retrieveBuffer img
+  return img'
+
+createImage :: IO FCImage
+createImage = fc1 <$> fc2CreateImage
+
+retrieveBuffer :: FCImage -> FlyCap FCImage
+retrieveBuffer blankImg = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2RetrieveBuffer ctx blankImg
+
+convertImageTo :: PixelFormat -> FCImage -> IO FCImage
+convertImageTo fmt img = do
+  createImage >>= \img' -> fc1 <$> fc2ConvertImageTo fmt img img'
+
+
+runFlyCap :: FlyCap a -> IO a
+runFlyCap a = do
+  ctx <- fc1 <$> fc2CreateContext
+  a <- (runReaderT $ unFlyCap a) ctx
+  fc0 <$> fc2DestroyContext ctx
+  return a
+
+testAction :: IO ()
+testAction = runFlyCap $ do
+  getNumOfCameras >>= (\n -> liftIO (print n))
+  g <- getCameraFromIndex 0
+  connect g
+  getCameraInfo >>= (\i -> liftIO (print i))
+  startCapture
+  liftIO $ print "Started Capture"
+  b <- getFrame
+  liftIO $ print "Got frame"
+  stopCapture
+
+  b' <- liftIO $ convertImageTo Fc2PixelFormatRgb8 b
+  dataPtr <- liftIO $ newForeignPtr_ (castPtr $ data'FCImage b')
+  let wid     = width'FCImage b'
+      hgt     = height'FCImage b'
+      isColor = stride'FCImage b' == 3 * wid
+      fromRGB = JP.imageFromUnsafePtr
+      fromG   = JP.imageFromUnsafePtr
+      jImg'
+        | isColor   = JP.encodeBitmap (fromRGB wid hgt dataPtr :: JP.Image JP.PixelRGB8)
+        | otherwise = JP.encodeBitmap (fromG   wid hgt dataPtr :: JP.Image JP.Pixel8)
+  case JP.decodeImage (BSL.toStrict jImg') of
+    Left s     -> liftIO . print $ "Decode error: " ++ s
+    Right jImg -> liftIO $ JP.saveBmpImage "test.bmp" jImg
+
+startCapture :: FlyCap ()
+startCapture = do
+  ctx <- ask
+  liftIO $ fc0 <$> fc2StartCapture ctx
+
+getCameraInfo :: FlyCap CamInfo
+getCameraInfo = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetCameraInfo ctx
+
+version :: Version
+version = fc1 $ unsafePerformIO fc2GetLibraryVersion
+
+connect :: Guid -> FlyCap ()
+connect g = do
+  ctx <- ask
+  _ <- liftIO $ fc2Connect ctx g
+  return ()
+
+getNumOfCameras :: FlyCap Int
+getNumOfCameras = do
+  ctx <- ask
+  liftIO $ (fromIntegral . fc1) <$> fc2GetNumOfCameras ctx
+
+
+getCameraFromIndex :: Int -> FlyCap Guid
+getCameraFromIndex i = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetCameraFromIndex ctx i
+
+
+getCameraFromSerialNumber :: Int -> FlyCap Guid
+getCameraFromSerialNumber sn = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetCameraFromSerialNumber ctx sn
+
+
+stopCapture :: FlyCap ()
+stopCapture = do
+  ctx <- ask
+  liftIO $ fc0 <$> fc2StopCapture ctx
+
 
 -- FlyCapture image specialized on CUChar (C 8-bit greyscale) pixels
 -- Obviously not the optimal data type.  We'd want the option
@@ -291,3 +400,20 @@ fromAVI = do
 -}
 
 -}
+
+
+fc0 :: Error -> ()
+fc0 Fc2ErrorOk = ()
+fc0 e          = error $ "FlyCapture2 error: " ++ show e
+
+fc1 :: (Error,a) -> a
+fc1 (Fc2ErrorOk,a) = a
+fc1 (e,_)          = error $ "FlyCapture2 error: " ++ show e
+
+fc2 :: (Error,a,b)   -> (a,b) 
+fc2 (Fc2ErrorOk,a,b) = (a,b)
+fc2 (e,_,_)          = error $ "FlyCapture2 error: " ++ show e
+
+fc3 :: (Error,a,b,c) -> (a,b,c)
+fc3 (Fc2ErrorOk,a,b,c) = (a,b,c)
+fc3 (e,_,_,_) = error $ "FlyCapture2 error: " ++ show e

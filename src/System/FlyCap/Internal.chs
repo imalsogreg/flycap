@@ -25,37 +25,9 @@ import qualified Data.ByteString.Lazy as BSL
 #include <FlyCapture2_C.h>
 #include <FlyCapture2Defs_C.h>
 
-newtype FlyCap a = FlyCap { unFlyCap :: ReaderT Context IO a }
-  deriving (MonadIO, MonadReader Context, Monad, Applicative, Functor)
-
-runFlyCap :: FlyCap a -> IO a
-runFlyCap a = do
-  ctx <- fc1 <$> fc2CreateContext
-  a <- (runReaderT $ unFlyCap a) ctx
-  fc0 <$> fc2DestroyContext ctx
-  return a
-
-testAction :: IO ()
-testAction = runFlyCap $ do
-  getNumOfCameras >>= (\n -> liftIO (print n))
-  g <- getCameraFromIndex 0
-  connect g
-  getCameraInfo >>= (\i -> liftIO (print i))
-  startCapture
-  liftIO $ print "Started Capture"
-  b <- getFrame
-  liftIO $ print "Got frame"
-  stopCapture
-
-  dataPtr <- liftIO $ newForeignPtr_ (castPtr $ data'FCImage b)
-  let jImg' = encodeBitmap (imageFromUnsafePtr 640 480 dataPtr :: Image Pixel8) :: BSL.ByteString
-  case decodeImage (BSL.toStrict jImg') of
-    Left s     -> liftIO . print $ "Decode error: " ++ s
-    Right jImg -> liftIO $ saveBmpImage "test.bmp" jImg
-
+------------------------------------------------------------------------------
 
 {#pointer *fc2Context as ContextPtr -> Context #}
-
 
 
 newtype Context = Context { unContext :: Ptr () }  
@@ -77,38 +49,18 @@ newtype Guid = Guid {unGuid :: [Int]} deriving (Eq, Show)
 {#fun fc2GetNumOfCameras as ^
  { unContext `Context' , alloca- `CUInt' peek* } -> `Error' #}
 
-getNumOfCameras :: FlyCap Int
-getNumOfCameras = do
-  ctx <- ask
-  liftIO $ (fromIntegral . fc1) <$> fc2GetNumOfCameras ctx
-
 
 {#fun fc2GetCameraFromIndex as ^
  { unContext `Context', `Int', alloca- `Guid' peek* } -> `Error' #}
-
-getCameraFromIndex :: Int -> FlyCap Guid
-getCameraFromIndex i = do
-  ctx <- ask
-  liftIO $ fc1 <$> fc2GetCameraFromIndex ctx i
 
 
 {#fun fc2GetCameraFromSerialNumber as ^
   { unContext `Context', `Int', alloca- `Guid' peek* } -> `Error' #}
 
-getCameraFromSerialNumber :: Int -> FlyCap Guid
-getCameraFromSerialNumber sn = do
-  ctx <- ask
-  liftIO $ fc1 <$> fc2GetCameraFromSerialNumber ctx sn
-
 
 {#fun fc2Connect as ^
   { unContext `Context', withT* `Guid' void- } -> `Error' #}
 
-connect :: Guid -> FlyCap ()
-connect g = do
-  ctx <- ask
-  _ <- liftIO $ fc2Connect ctx g
-  return ()
 
 
 {#pointer *fc2Image as FCImagePtr -> FCImage #}
@@ -166,8 +118,6 @@ data Version = Version{ major'Version :: Int
 {#fun fc2GetLibraryVersion as ^
   { alloca- `Version' peek* } -> `Error' #}
 
-version :: Version
-version = fc1 $ unsafePerformIO fc2GetLibraryVersion
 
 instance Storable Version where
   sizeOf _    = {#sizeof fc2Version #}
@@ -264,6 +214,9 @@ instance Storable ConfigRom where
 {#enum fc2PCIeBusSpeed as PCIeBusSpeed {underscoreToCase}
   deriving (Show, Eq) #}
 
+{#enum fc2PixelFormat as PixelFormat {underscoreToCase}
+  deriving (Show, Eq) #}
+
 {#enum fc2BayerTileFormat as BayerTileFormat {underscoreToCase}
   deriving (Show, Eq) #}
 
@@ -306,10 +259,6 @@ data CamInfo = CamInfo
 {#fun fc2GetCameraInfo as ^
  { unContext `Context', alloca- `CamInfo' peek* } -> `Error' #}
 
-getCameraInfo :: FlyCap CamInfo
-getCameraInfo = do
-  ctx <- ask
-  liftIO $ fc1 <$> fc2GetCameraInfo ctx
 
 instance Storable CamInfo where
   sizeOf _ = {#sizeof fc2CameraInfo #}
@@ -353,73 +302,34 @@ instance Storable CamInfo where
 {#fun fc2StartCapture as ^
   { unContext `Context' } -> `Error' #}
 
-startCapture :: FlyCap ()
-startCapture = do
-  ctx <- ask
-  liftIO $ fc0 <$> fc2StartCapture ctx
 
 {#fun fc2StopCapture as ^
   { unContext `Context' } -> `Error' #}
 
-stopCapture :: FlyCap ()
-stopCapture = do
-  ctx <- ask
-  liftIO $ fc0 <$> fc2StopCapture ctx
   
 
 data FCImage = FCImage { height'FCImage           :: !Int
                        , width'FCImage            :: !Int
                        , stride'FCImage           :: !Int
---                       , data'FCImage             :: !BS.ByteString
                        , data'FCImage             :: !(Ptr CUChar)
                        , dataSize'FCImage         :: !Int
                        , receivedDataSize'FCImage :: !Int
-                       , format'FCImage           :: !Int
+                       , format'FCImage           :: !PixelFormat
                        , bayerFormat'FCImage      :: !BayerTileFormat
                        , impl'FCImage             :: !(Ptr ())
                        } deriving (Show)
 
 
-getFrame :: FlyCap FCImage
-getFrame = do
-  ctx <- ask
-  img <- liftIO createImage
-  liftIO $ print "IMG"
---  liftIO $ print img
-  img' <- retrieveBuffer img
-  liftIO $ print "IMG'"
---  liftIO $ print img'
-  return img'
-
 {#fun fc2RetrieveBuffer as ^
    { unContext `Context', withT* `FCImage' peek* } -> `Error' #}
-
-{-
-fc2RetrieveBuffer :: (Context) -> (FCImage) -> IO ((Error), (FCImage))
-fc2RetrieveBuffer a1 a2 =
-  let {a1' = unContext a1} in 
-  withT a2 $ \a2' -> do
-    print "ABOUT TO fc2RetrieveBuffer"
-    res <- fc2RetrieveBuffer'_ a1' a2'
-    print "DID fc2RetrieveBuffer"
-    let {res' = (toEnum . fromIntegral) res}
-    print "ABOUT TO PEEK"
-    a2'' <- peek  a2'
-    print "PEEKED"
-    return (res', a2'')
--}
 
 
 {#fun fc2CreateImage as ^
   { alloca- `FCImage' peek* } -> `Error' #}
 
-createImage :: IO FCImage
-createImage = fc1 <$> fc2CreateImage
+{#fun fc2ConvertImageTo as ^
+  { `PixelFormat', withT* `FCImage', withT* `FCImage' peek* } -> `Error' #}
 
-retrieveBuffer :: FCImage -> FlyCap FCImage
-retrieveBuffer blankImg = do
-  ctx <- ask
-  liftIO $ fc1 <$> fc2RetrieveBuffer ctx blankImg
 
 ------------------------------------------------------------------------------
 instance Storable FCImage where
@@ -453,12 +363,10 @@ instance Storable FCImage where
     poke' (p `plusPtr` {#offsetof fc2Image->stride #}) stride'FCImage
     poke' (p `plusPtr` {#offsetof fc2Image->pData #}) data'FCImage
     poke' (p `plusPtr` {#offsetof fc2Image->receivedDataSize #}) receivedDataSize'FCImage
-    poke' (p `plusPtr` {#offsetof fc2Image->format #}) format'FCImage
+    poke' (p `plusPtr` {#offsetof fc2Image->format #}) (fromEnum format'FCImage)
     poke' (p `plusPtr` {#offsetof fc2Image->bayerFormat #}) (fromEnum bayerFormat'FCImage)
     poke' (p `plusPtr` {#offsetof fc2Image->imageImpl #}) impl'FCImage
     
-
-{#enum fc2PixelFormat as PixelFormat {underscoreToCase} deriving (Show, Eq) #}
 
 {#enum fc2VideoMode as VideoMode {underscoreToCase} deriving (Show, Eq) #}
 
@@ -569,19 +477,3 @@ ctoJImage (CImage r c _ p _ _ _ _ ) = do
   return bs
  
 -}
-
-fc0 :: Error -> ()
-fc0 Fc2ErrorOk = ()
-fc0 e          = error $ "FlyCapture2 error: " ++ show e
-
-fc1 :: (Error,a) -> a
-fc1 (Fc2ErrorOk,a) = a
-fc1 (e,_)          = error $ "FlyCapture2 error: " ++ show e
-
-fc2 :: (Error,a,b)   -> (a,b) 
-fc2 (Fc2ErrorOk,a,b) = (a,b)
-fc2 (e,_,_)          = error $ "FlyCapture2 error: " ++ show e
-
-fc3 :: (Error,a,b,c) -> (a,b,c)
-fc3 (Fc2ErrorOk,a,b,c) = (a,b,c)
-fc3 (e,_,_,_) = error $ "FlyCapture2 error: " ++ show e
