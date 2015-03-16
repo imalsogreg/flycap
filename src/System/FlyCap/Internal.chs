@@ -3,6 +3,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+
 
 module System.FlyCap.Internal where
 
@@ -22,6 +24,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 
 
+
 #include <FlyCapture2_C.h>
 #include <FlyCapture2Defs_C.h>
 
@@ -30,13 +33,13 @@ import qualified Data.ByteString.Lazy as BSL
 {#pointer *fc2Context as ContextPtr -> Context #}
 
 
-newtype Context = Context { unContext :: Ptr () }  
+newtype Context = Context { unContext :: Ptr () }
                 deriving (Eq, Show, Storable)
 
 
 {#pointer *fc2PGRGuid as GuidPtr -> Guid #}
 
-newtype Guid = Guid {unGuid :: [Int]} deriving (Eq, Show) 
+newtype Guid = Guid {unGuid :: [Int]} deriving (Eq, Show)
 
 {#enum fc2Error as Error {underscoreToCase} deriving (Show,Eq) #}
 
@@ -65,8 +68,139 @@ newtype Guid = Guid {unGuid :: [Int]} deriving (Eq, Show)
 
 {#pointer *fc2Image as FCImagePtr -> FCImage #}
 
+{#pointer *fc2TriggerMode as TriggerModePtr -> TriggerMode #}
+
+{#pointer *fc2TriggerModeInfo as TriggerModeInfoPtr -> TriggerModeInfo #}
+
+{#fun fc2FireSoftwareTrigger as ^
+  { unContext `Context' } -> `Error' #}
 
 
+{#fun fc2SetTriggerMode as ^
+  { unContext `Context', withT* `TriggerMode' } -> `Error' #}
+
+
+
+data TriggerStyle
+  = TriggerStandard
+  | TriggerBulbShutter
+  | TriggerSkipFrames
+  | TriggerMultipleExposure
+  | TriggerMultipleExposurePulseWidth
+  | TriggerOverlappedExposure
+  | TriggerMultiShot
+  | TriggerUnknown
+  deriving (Eq, Show)
+
+instance Enum TriggerStyle where
+
+  fromEnum TriggerStandard                   = 0
+  fromEnum TriggerBulbShutter                = 1
+  fromEnum TriggerSkipFrames                 = 3
+  fromEnum TriggerMultipleExposure           = 4
+  fromEnum TriggerMultipleExposurePulseWidth = 5
+  fromEnum TriggerOverlappedExposure         = 14
+  fromEnum TriggerMultiShot                  = 15
+  fromEnum TriggerUnknown                    = -1
+
+  toEnum 0  = TriggerStandard
+  toEnum 1  = TriggerBulbShutter
+  toEnum 3  = TriggerSkipFrames
+  toEnum 4  = TriggerMultipleExposure
+  toEnum 5  = TriggerMultipleExposurePulseWidth
+  toEnum 14 = TriggerOverlappedExposure
+  toEnum 15 = TriggerMultiShot
+  toEnum _  = TriggerUnknown
+
+
+data TriggerMode = TriggerMode {
+    onOff'TriggerMode     :: !Bool
+  , polarity'TriggerMode  :: !Int
+  , source'TriggerMode    :: !Int
+  , mode'TriggerMode      :: !TriggerStyle
+  , parameter'TriggerMode :: !Int -- What is this?
+  , reserved'TriggerMode  :: ![Int]
+  } deriving (Eq, Show)
+
+{#fun fc2GetTriggerMode as ^
+  { unContext `Context', alloca- `TriggerMode' peek* } -> `Error' #}
+
+instance Storable TriggerMode where
+  sizeOf _ = {#sizeof fc2TriggerMode #}
+  alignment _ = 4
+  peek p =
+    TriggerMode
+    <$> ((toEnum . fromIntegral) <$> {#get fc2TriggerMode->onOff #} p)
+    <*> (fromIntegral <$> {#get fc2TriggerMode->polarity #} p)
+    <*> (fromIntegral <$> {#get fc2TriggerMode->source #} p)
+    <*> ((toEnum . fromIntegral) <$> {#get fc2TriggerMode->mode #} p)
+    <*> (fromIntegral <$> {#get fc2TriggerMode->parameter #} p)
+    <*> (map fromIntegral <$> peekArray 4
+            (p `plusPtr`
+             {#offsetof fc2TriggerMode->reserved #} :: Ptr CUInt))
+  poke p TriggerMode{..} = do
+    let p' = (p `plusPtr`)
+        fI = fromIntegral
+    poke (p' {#offsetof fc2TriggerMode->onOff #})     ((fI . fromEnum)  onOff'TriggerMode :: CUInt)
+    poke (p' {#offsetof fc2TriggerMode->polarity #})  ((fI . fromEnum) polarity'TriggerMode :: CUInt)
+    poke (p' {#offsetof fc2TriggerMode->source #})    (fI source'TriggerMode :: CUInt)
+    poke (p' {#offsetof fc2TriggerMode->mode #})      (fI . fromEnum $ mode'TriggerMode :: CUInt)
+    poke (p' {#offsetof fc2TriggerMode->parameter #}) (fI parameter'TriggerMode :: CUInt)
+    pokeArray (p' {#offsetof fc2TriggerMode->reserved #} :: Ptr CUInt)
+      (map fromIntegral (reserved'TriggerMode))
+
+
+data TriggerModeInfo = TriggerModeInfo {
+    present'TriggerModeInfo                  :: !Bool
+  , readOutSupported'TriggerModeInfo         :: !Bool
+  , onOffSupported'TriggerModeInfo           :: !Bool
+  , polaritySupported'TriggerModeInfo        :: !Bool
+  , valueReadable'TriggerModeInfo            :: !Bool
+  , sourceMask'TriggerModeInfo               :: !Int
+  , softwareTriggerSupported'TriggerModeInfo :: !Bool
+  , modeMask'TriggerModeInfo                 :: !Int
+  , reserved'TriggerModeInfo                 :: ![Int]
+  } deriving (Eq, Show)
+
+{#fun fc2GetTriggerModeInfo as ^
+  { unContext `Context', alloca- `TriggerModeInfo' peek* } -> `Error' #}
+
+instance Storable TriggerModeInfo where
+  sizeOf _ = {#sizeof fc2TriggerModeInfo #}
+  alignment _ = 4
+  peek p =
+    TriggerModeInfo
+    <$> b' ({#get fc2TriggerModeInfo->present #} p)
+    <*> b' ({#get fc2TriggerModeInfo->readOutSupported #} p)
+    <*> b' ({#get fc2TriggerModeInfo->onOffSupported #} p)
+    <*> b' ({#get fc2TriggerModeInfo->polaritySupported #} p)
+    <*> b' ({#get fc2TriggerModeInfo->valueReadable #} p)
+    <*> (fromIntegral <$> {#get fc2TriggerModeInfo->sourceMask #} p)
+    <*> b' ({#get fc2TriggerModeInfo->softwareTriggerSupported #} p)
+    <*> (fromIntegral <$> {#get fc2TriggerModeInfo->modeMask #} p)
+    <*> (map fromIntegral <$> peekArray 8
+          (p `plusPtr` {#offsetof fc2TriggerModeInfo->reserved #} :: Ptr CUInt))
+     where b' = fmap (toEnum . fromIntegral)
+  poke p TriggerModeInfo{..} = do
+    {#set fc2TriggerModeInfo->present #}           p
+       (b' present'TriggerModeInfo)
+    {#set fc2TriggerModeInfo->readOutSupported #}  p
+       (b' readOutSupported'TriggerModeInfo)
+    {#set fc2TriggerModeInfo->onOffSupported #}    p
+       (b' onOffSupported'TriggerModeInfo)
+    {#set fc2TriggerModeInfo->polaritySupported #} p
+       (b' polaritySupported'TriggerModeInfo)
+    {#set fc2TriggerModeInfo->valueReadable #}     p
+       (b' valueReadable'TriggerModeInfo)
+    {#set fc2TriggerModeInfo->sourceMask #}        p
+       (fromIntegral sourceMask'TriggerModeInfo)
+    {#set fc2TriggerModeInfo->valueReadable #}     p
+       (b' softwareTriggerSupported'TriggerModeInfo)
+    {#set fc2TriggerModeInfo->modeMask #}          p
+       (fromIntegral modeMask'TriggerModeInfo)
+    pokeArray (p `plusPtr` {#offsetof fc2TriggerModeInfo->reserved #} :: Ptr CUInt)
+      (map fromIntegral reserved'TriggerModeInfo)
+    where b' = fromIntegral . fromEnum
 
 ------------------------------------------------------------------------------
 instance Storable Guid where
@@ -306,6 +440,11 @@ instance Storable CamInfo where
 {#fun fc2StopCapture as ^
   { unContext `Context' } -> `Error' #}
 
+{#fun fc2StartSyncCapture as ^
+  { `Int', withContextArray* `[Context]' void- } -> `Error' #}
+
+withContextArray :: [Context] -> (Ptr Context -> IO a) -> IO a
+withContextArray = withArray
   
 
 data FCImage = FCImage { height'FCImage           :: !Int
@@ -358,14 +497,14 @@ instance Storable FCImage where
 
 --  poke p FCImage{..} = BS.useAsCString data'FCImage $ \pData -> do
   poke p FCImage{..} = do
-    poke' (p `plusPtr` {#offsetof fc2Image->rows #}) height'FCImage
-    poke' (p `plusPtr` {#offsetof fc2Image->cols #}) width'FCImage
-    poke' (p `plusPtr` {#offsetof fc2Image->stride #}) stride'FCImage
-    poke' (p `plusPtr` {#offsetof fc2Image->pData #}) data'FCImage
-    poke' (p `plusPtr` {#offsetof fc2Image->receivedDataSize #}) receivedDataSize'FCImage
-    poke' (p `plusPtr` {#offsetof fc2Image->format #}) (fromEnum format'FCImage)
-    poke' (p `plusPtr` {#offsetof fc2Image->bayerFormat #}) (fromEnum bayerFormat'FCImage)
-    poke' (p `plusPtr` {#offsetof fc2Image->imageImpl #}) impl'FCImage
+    poke (p `plusPtr` {#offsetof fc2Image->rows #}) height'FCImage
+    poke (p `plusPtr` {#offsetof fc2Image->cols #}) width'FCImage
+    poke (p `plusPtr` {#offsetof fc2Image->stride #}) stride'FCImage
+    poke (p `plusPtr` {#offsetof fc2Image->pData #}) data'FCImage
+    poke (p `plusPtr` {#offsetof fc2Image->receivedDataSize #}) receivedDataSize'FCImage
+    poke (p `plusPtr` {#offsetof fc2Image->format #}) (fromEnum format'FCImage)
+    poke (p `plusPtr` {#offsetof fc2Image->bayerFormat #}) (fromEnum bayerFormat'FCImage)
+    poke (p `plusPtr` {#offsetof fc2Image->imageImpl #}) impl'FCImage
     
 
 {#enum fc2VideoMode as VideoMode {underscoreToCase} deriving (Show, Eq) #}

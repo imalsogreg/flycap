@@ -1,13 +1,16 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module System.FlyCap where
 
 import Control.Applicative
+import Control.Error
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader
 import Control.Monad.Reader.Class
 import qualified Data.ByteString.Lazy as BSL
+import Data.Traversable
 import System.FlyCap.Internal
 import qualified System.FlyCap.Internal as FCI
 import Foreign
@@ -16,18 +19,121 @@ import System.IO.Unsafe (unsafePerformIO)
 
 import Foreign.C.Error
 
---import CV.HighGUI
---import CV.Video
---import CV.Image
---import CV.Conversions
-
 import System.FlyCap.Internal hiding (Context)
---import qualified Data.Vector.Storable as VS
+
 import qualified Codec.Picture as JP
 import qualified Codec.Picture.Types as JP
 
 newtype FlyCap a = FlyCap { unFlyCap :: ReaderT Context IO a }
   deriving (MonadIO, MonadReader Context, Monad, Applicative, Functor)
+
+type ColorImage = JP.Image JP.PixelRGBA8
+
+data CameraID
+  = CameraIndex Int
+  | CameraSSN   Int
+  deriving (Eq, Show)
+
+
+-- * High-level requests
+
+
+getFrameProducer :: CaptureOptions -> [CameraID] -> EitherT String IO (IO [ColorImage], IO ())
+getFrameProducer opts@CaptureOptions{..} ids =
+  traverse setupCamera opts ids
+    where setupCamera :: CaptureOptions -> CameraID -> EitherT String IO (IO ColorImage, IO ())
+          setupCamera (CaptureOptions (FreeRunning fps)) cID = runFlyCap $ do
+            cam <- getCamera cID
+            connect cam
+            startCapture
+            return (getFrame, stopCapture)
+
+data CaptureTiming
+  = FreeRunning Double
+  | Triggered TriggerStyle
+  deriving (Eq, Show)
+
+data CaptureOptions = CaptureOptions {
+    captureTiming :: CaptureTiming
+  } deriving (Eq, Show)
+
+
+-- * Setup
+
+runFlyCap :: FlyCap a -> IO a
+runFlyCap a = do
+  ctx <- fc1 <$> fc2CreateContext
+  a'  <- (runReaderT $ unFlyCap a) ctx
+  fc0 <$> fc2DestroyContext ctx
+  return a'
+
+connect :: Guid -> FlyCap ()
+connect g = do
+  ctx <- ask
+  _ <- liftIO $ fc2Connect ctx g
+  return ()
+
+startCapture :: FlyCap ()
+startCapture = do
+  ctx <- ask
+  liftIO $ fc0 <$> fc2StartCapture ctx
+
+stopCapture :: FlyCap ()
+stopCapture = do
+  ctx <- ask
+  liftIO $ fc0 <$> fc2StopCapture ctx
+
+startSyncCapture :: [Context] -> IO ()
+startSyncCapture cxts = fc0 <$> fc2StartSyncCapture (length cxts) cxts
+
+
+-- * Info
+
+getCameraInfo :: FlyCap CamInfo
+getCameraInfo = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetCameraInfo ctx
+
+version :: Version
+version = fc1 $ unsafePerformIO fc2GetLibraryVersion
+
+
+getNumOfCameras :: FlyCap Int
+getNumOfCameras = do
+  ctx <- ask
+  liftIO $ (fromIntegral . fc1) <$> fc2GetNumOfCameras ctx
+
+getCamera :: CameraID -> FlyCap Guid
+getCamera (CameraIndex n) = getCameraFromIndex n
+getCamera (CameraSSN   s) = getCameraFromSerialNumber s
+
+getCameraFromIndex :: Int -> FlyCap Guid
+getCameraFromIndex i = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetCameraFromIndex ctx i
+
+
+getCameraFromSerialNumber :: Int -> FlyCap Guid
+getCameraFromSerialNumber sn = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetCameraFromSerialNumber ctx sn
+
+
+-- * Frames
+
+fc2Juicy :: FCImage -> IO ColorImage
+fc2Juicy fcImg = do
+  b' <- convertImageTo Fc2PixelFormatRgb8 fcImg
+  dataPtr <- newForeignPtr_ (castPtr (data'FCImage b'))
+  let wid = width'FCImage b'
+      hgt = height'FCImage b'
+      isColor = stride'FCImage b' == 3 * wid
+      fromRGB = JP.imageFromUnsafePtr
+      fromG   = JP.imageFromUnsafePtr
+      jImg'
+        | isColor = JP.imageFromUnsafePtr wid hgt dataPtr
+        | otherwise = JP.promoteImage (JP.imageFromUnsafePtr wid hgt dataPtr :: JP.Image JP.Pixel8)
+    in return jImg'
 
 
 getFrame :: FlyCap FCImage
@@ -36,6 +142,7 @@ getFrame = do
   img <- liftIO createImage
   img' <- retrieveBuffer img
   return img'
+
 
 createImage :: IO FCImage
 createImage = fc1 <$> fc2CreateImage
@@ -50,12 +157,30 @@ convertImageTo fmt img = do
   createImage >>= \img' -> fc1 <$> fc2ConvertImageTo fmt img img'
 
 
-runFlyCap :: FlyCap a -> IO a
-runFlyCap a = do
-  ctx <- fc1 <$> fc2CreateContext
-  a <- (runReaderT $ unFlyCap a) ctx
-  fc0 <$> fc2DestroyContext ctx
-  return a
+-- * Triggers
+
+fireSoftwareTrigger :: FlyCap ()
+fireSoftwareTrigger = do
+  ctx <- ask
+  liftIO $ fc0 <$> fc2FireSoftwareTrigger ctx
+
+getTriggerMode :: FlyCap TriggerMode
+getTriggerMode = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetTriggerMode ctx
+
+setTriggerMode :: TriggerMode -> FlyCap ()
+setTriggerMode tm = do
+  ctx <- ask
+  liftIO $ fc0 <$> fc2SetTriggerMode ctx tm
+
+getTriggerModeInfo :: FlyCap TriggerModeInfo
+getTriggerModeInfo = do
+  ctx <- ask
+  liftIO $ fc1 <$> fc2GetTriggerModeInfo ctx
+
+
+-- * Experiment / testing
 
 testAction :: IO ()
 testAction = runFlyCap $ do
@@ -82,49 +207,6 @@ testAction = runFlyCap $ do
   case JP.decodeImage (BSL.toStrict jImg') of
     Left s     -> liftIO . print $ "Decode error: " ++ s
     Right jImg -> liftIO $ JP.saveBmpImage "test.bmp" jImg
-
-startCapture :: FlyCap ()
-startCapture = do
-  ctx <- ask
-  liftIO $ fc0 <$> fc2StartCapture ctx
-
-getCameraInfo :: FlyCap CamInfo
-getCameraInfo = do
-  ctx <- ask
-  liftIO $ fc1 <$> fc2GetCameraInfo ctx
-
-version :: Version
-version = fc1 $ unsafePerformIO fc2GetLibraryVersion
-
-connect :: Guid -> FlyCap ()
-connect g = do
-  ctx <- ask
-  _ <- liftIO $ fc2Connect ctx g
-  return ()
-
-getNumOfCameras :: FlyCap Int
-getNumOfCameras = do
-  ctx <- ask
-  liftIO $ (fromIntegral . fc1) <$> fc2GetNumOfCameras ctx
-
-
-getCameraFromIndex :: Int -> FlyCap Guid
-getCameraFromIndex i = do
-  ctx <- ask
-  liftIO $ fc1 <$> fc2GetCameraFromIndex ctx i
-
-
-getCameraFromSerialNumber :: Int -> FlyCap Guid
-getCameraFromSerialNumber sn = do
-  ctx <- ask
-  liftIO $ fc1 <$> fc2GetCameraFromSerialNumber ctx sn
-
-
-stopCapture :: FlyCap ()
-stopCapture = do
-  ctx <- ask
-  liftIO $ fc0 <$> fc2StopCapture ctx
-
 
 -- FlyCapture image specialized on CUChar (C 8-bit greyscale) pixels
 -- Obviously not the optimal data type.  We'd want the option

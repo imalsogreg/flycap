@@ -1,8 +1,8 @@
-Name:     flycap
-Version:  0.1.0
-License:  BSD3
-License-File: LICENSE
-Copyright:          (c) 2013 Greg Hale
+Name:               flycap
+Version:            0.1.0
+License:            BSD3
+License-File:       LICENSE
+Copyright:          (c) 2013-2015 Greg Hale
 Author:             Greg Hale, Sarah Walker
 Maintainer:         imalsogreg@gmail.com
 Stability:          Experimental
@@ -15,7 +15,20 @@ Cabal-Version:      >=1.10
 Extra-Source-Files: README.md
                   , tests/*.hs
 Description:
-  Description to come.
+  The /FlyCapture2 SDK/ provides c and c++ access to Point Grey (<http://ptgrey.com>) research-grade cameras. 
+  The @System.Flycap@ package is limited a binding to the c SDK. Right now in Haskell you can:
+  .
+    - Get basic system info (camera count, camera manufacturer info)
+  .
+    - Start/stop acquisition runs
+  .
+    - Address cameras by index or serial number
+  .
+    - Set free-running/triggered operation
+  .
+    - Acquire frames
+  .
+    - Convert to JuicyPixels types
 
 Source-Repository head
   Type:     git
@@ -28,6 +41,7 @@ Library
       base     (>= 4 && <= 5)
     , bytestring
     , carray
+    , errors
     , JuicyPixels (>=3.1 && < 4.0)
     , mtl
     , transformers
